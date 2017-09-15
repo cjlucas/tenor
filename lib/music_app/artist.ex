@@ -4,6 +4,8 @@ defmodule MusicApp.Artist do
   schema "artists" do
     field :name, :string
     field :sort_name, :string
+    
+    timestamps(type: :utc_datetime)
 
     has_many :albums, MusicApp.Album
     has_many :tracks, MusicApp.Track

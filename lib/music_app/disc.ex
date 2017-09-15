@@ -4,6 +4,8 @@ defmodule MusicApp.Disc do
   schema "discs" do
     field :name, :string
     field :position, :integer
+    
+    timestamps(type: :utc_datetime)
 
     has_many :tracks, MusicApp.Track
     belongs_to :album, MusicApp.Album
