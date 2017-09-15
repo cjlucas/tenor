@@ -16,8 +16,11 @@ defmodule MusicApp.Repo.Migrations.CreateTables do
       add :id, :uuid, primary_key: true
 
       add :name, :string
+      add :position, :integer
+      add :release_date, :naive_datetime
 
       add :artist_id, references(:artists, type: :uuid)
+      add :album_artist_id, references(:artists, type: :uuid)
       add :album_id, references(:albums, type: :uuid)
       add :file_id, references(:files, type: :uuid)
     end
@@ -39,6 +42,6 @@ defmodule MusicApp.Repo.Migrations.CreateTables do
       add :artist_id, references(:artists, type: :uuid)
     end
 
-    create index(:albums, :name, unique: true)
+    create index(:albums, [:artist_id, :name])
   end
 end

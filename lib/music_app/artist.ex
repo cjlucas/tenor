@@ -8,4 +8,9 @@ defmodule MusicApp.Artist do
     has_many :albums, MusicApp.Album
     has_many :tracks, MusicApp.Track
   end
+
+  def changeset(artist, params \\ %{}) do
+    artist
+    |> cast(params, [:name, :sort_name])
+  end
 end
