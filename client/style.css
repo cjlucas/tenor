@@ -1,0 +1,66 @@
+/* Prevent full screen rubber-banding.
+ * Individual divs with overflow: scroll will still have bounce.
+ */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  /*background-color: pink;*/
+}
+
+/*
+ * The viewport for the entire SPA. Designed to fill the entire window.
+ *
+ * TODO: Determine if this is necessary.
+ */
+.viewport {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  /*background-color: pink;*/
+}
+
+.main {
+  margin-left: auto;
+  margin-right: 0;
+  width: 90%;
+  height: 100%;
+}
+
+.sidebar {
+  /*background-color: red;*/
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  overflow-y: scroll;
+}
+
+.content {
+  width: 90;
+  /*background-color: blue;*/
+  top: 0;
+  bottom: 0;
+  overflow-y: scroll;
+}
+
+.album img {
+  max-width: 350px;
+}
+
+.pointer {
+  cursor: pointer;
+}
+
+.header {
+  height: 140px;
+}
+
+.now-playing {
+  height: 90%;
+}
+
+.now-playing > img {
+  width: 120px;
+}

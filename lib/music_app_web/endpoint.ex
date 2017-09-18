@@ -38,6 +38,8 @@ defmodule MusicAppWeb.Endpoint do
     key: "_music_app_key",
     signing_salt: "u23gu8bk"
 
+  plug CORSPlug
+
   plug MusicAppWeb.Router
 
   @doc """

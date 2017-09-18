@@ -52,3 +52,8 @@ config :phoenix, :stacktrace_depth, 20
 config :music_app, MusicApp.Repo,
   adapter: Sqlite.Ecto2,
   database: "dev.db"
+
+config :cors_plug,
+  origin: ["http://localhost:8000", "http://localhost:8080"],
+  max_age: 86400,
+  methods: ["GET", "POST"]
