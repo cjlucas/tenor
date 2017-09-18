@@ -18,7 +18,7 @@ defmodule AudioScanner do
       sort_artist: nil,
       album_name: nil,
       release_date: nil,
-      disc_position: nil,
+      disc_position: 1,
       total_discs: nil,
       disc_name: nil,
       images: [],
@@ -62,7 +62,7 @@ defmodule AudioScanner do
               %Text{frame_id: "TALB", text: text} ->
                 %{track | album_name: text}
               %Text{frame_id: "TYER", text: text} ->
-                date = {String.to_integer(text), 0, 0} |> Date.from_erl
+                date = {String.to_integer(text), 1, 1} |> Date.from_erl!
                 %{track | release_date: date}
               %Text{frame_id: "TDRC", text: text} ->
                 date = MusicApp.Utils.parse_id3_timestamp(text)

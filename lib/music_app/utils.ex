@@ -29,7 +29,14 @@ defmodule MusicApp.Utils do
     ~r/(?<year>(1[89][0-9]{2}|2[0-9]{3}))/x,
     ]
 
-  @default_capture ["year", "month", "day", "hour", "minute", "second"] |> Enum.map(fn k -> {k, 0} end) |> Enum.into(%{})
+  @default_capture %{
+    "year" => 0,
+    "month" => 1,
+    "day" => 1,
+    "hour" => 0,
+    "minute" => 0,
+    "second" => 0,
+  }
 
   def parse_id3_timestamp(ts) do
     @id3_timetamp_res
