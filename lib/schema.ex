@@ -31,6 +31,7 @@ defmodule MusicApp.Schema do
           from(
             artist in Artist, 
             join: album in assoc(artist, :albums),
+            distinct: true,
             select: artist,
             where: album.artist_id == artist.id,
             limit: ^limit, 
@@ -58,6 +59,14 @@ defmodule MusicApp.Schema do
           |> List.last
 
         {:ok, %{edges: edges, end_cursor: end_cursor}}
+      end
+    end
+
+    field :artist, :artist do
+      arg :id, non_null(:id)
+
+      resolve fn %{id: id}, ctx ->
+        {:ok, Repo.get(Artist, id)}
       end
     end
   end
