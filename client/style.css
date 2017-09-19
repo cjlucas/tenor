@@ -54,7 +54,7 @@ html, body {
 }
 
 .header {
-  height: 140px;
+  height: 80px;
 }
 
 .now-playing {
@@ -62,5 +62,14 @@ html, body {
 }
 
 .now-playing > img {
-  width: 120px;
+  height: 100%;
+}
+
+.controls {
+  justify-content: space-around;
+  align-items: center;
+}
+
+.controls > .fa-pause, .controls > .fa-play {
+  font-size: 2.5em;
 }

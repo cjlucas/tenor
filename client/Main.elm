@@ -210,6 +210,7 @@ type Msg
     | GotChosenArtist (Result GraphQL.Client.Http.Error Artist)
     | ChoseTrack String String
     | PlayerEvent PlayerEvent
+    | TogglePlayPause
 
 
 update msg model =
@@ -280,6 +281,17 @@ update msg model =
                     updatePlayer event model.player
             in
                 ( { model | player = player }, cmd )
+
+        TogglePlayPause ->
+            case model.player.state of
+                Playing ->
+                    ( model, Ports.pause )
+
+                Paused ->
+                    ( model, Ports.play )
+
+                Stopped ->
+                    ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -468,25 +480,57 @@ viewArtist artist =
         [ text artist.name ]
 
 
+viewNowPlaying player =
+    let
+        playPauseIcon =
+            i
+                [ class "p1 fa"
+                , classList
+                    [ ( "fa-play", player.state == Paused )
+                    , ( "fa-pause", player.state /= Paused )
+                    ]
+                , onClick TogglePlayPause
+                ]
+                []
+    in
+        case List.head player.tracks of
+            Just ( track, _ ) ->
+                div [ class "now-playing flex align-middle" ]
+                    [ div [ class "flex controls" ]
+                        [ i [ class "p2 fa fa-backward fa-2x" ] []
+                        , playPauseIcon
+                        , i [ class "p2 fa fa-forward fa-2x" ] []
+                        ]
+                    , img [ class "pr1", src ("http://localhost:4000/image/" ++ track.id) ] []
+                    , div [ class "flex flex-column justify-center" ]
+                        [ div [ class "h2 bold" ] [ text track.name ]
+                        , div [ class "h3" ] [ text "Jack Johnson - All the Light Above it Too" ]
+                        , div [ class "h3 bold align-bottom" ] [ text "Up Next: Something Else" ]
+                        ]
+                    ]
+
+            Nothing ->
+                text ""
+
+
 viewHeader player =
     let
-        viewNowPlaying =
-            case List.head player.tracks of
-                Just ( track, _ ) ->
-                    div [ class "now-playing flex align-middle" ]
-                        [ img [ src ("http://localhost:4000/image/" ++ track.id) ] []
-                        , div []
-                            [ div [ class "h2 bold" ] [ text track.name ]
-                            , div [ class "h3" ] [ text "Jack Johnson - All the Light Above it Too" ]
-                            , div [ class "h3 bold align-bottom" ] [ text "Up Next: Something Else" ]
-                            ]
-                        ]
+        viewItems =
+            [ "Artists"
+            , "Albums"
+            , "Up Next"
+            ]
+                |> List.map
+                    (\item ->
+                        li [ class "h2 inline-block m3" ] [ text item ]
+                    )
 
-                Nothing ->
-                    text ""
+        viewMenu =
+            ul [ class "ml4 mr4 list-reset" ] viewItems
     in
-        div [ class "header flex border" ]
-            [ viewNowPlaying
+        div [ class "header flex justify-between items-center border-bottom" ]
+            [ viewMenu
+            , viewNowPlaying player
             ]
 
 
