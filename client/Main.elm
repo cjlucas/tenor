@@ -603,9 +603,9 @@ viewNowPlaying player =
                         ]
                     , img [ class "pr1", src ("http://localhost:4000/image/" ++ track.id) ] []
                     , div [ class "flex flex-column justify-center" ]
-                        [ div [ class "h3 bold" ] [ text track.name ]
-                        , div [ class "h4" ] [ text "Jack Johnson - All the Light Above it Too" ]
-                        , div [ class "h4 bold align-bottom" ] [ text "Up Next: Something Else" ]
+                        [ div [ class "h4 bold" ] [ text track.name ]
+                        , div [ class "h5" ] [ text "Jack Johnson - All the Light Above it Too" ]
+                        , div [ class "h5 bold align-bottom" ] [ text "Up Next: Something Else" ]
                         ]
                     ]
 

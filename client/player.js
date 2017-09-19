@@ -26,9 +26,12 @@ class Player {
     }
 
     const player = this._currentPlayer();
-    if (player) {
-      player.play();
+    if (!player) {
+      console.error(`No player found for id: ${id}`);
+      return;
     }
+
+    player.play();
   }
 
   unload(id) {
