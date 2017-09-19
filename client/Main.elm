@@ -11,6 +11,7 @@ import GraphQL.Client.Http
 import Ports
 import Json.Decode as Decode
 import List.Extra
+import Page.Album
 
 
 streamUrl id =
@@ -148,36 +149,19 @@ type alias Track =
     }
 
 
-type alias Album =
-    { id : String
-    , name : String
-    , tracks : List Track
-    }
+type Page
+    = Blank
+    | Album Page.Album.Model
 
 
-type alias SidebarArtist =
-    { id : String
-    , name : String
-    , albumCount : Int
-    , trackCount : Int
-    }
-
-
-type alias Artist =
-    { name : String
-    , albums : List Album
-    }
-
-
-findAlbum : String -> Artist -> Maybe Album
-findAlbum id artist =
-    artist.albums |> List.filter (\album -> album.id == id) |> List.head
+type PageState
+    = TransitioningFrom Page
+    | PageLoaded Page -- Name conflict with BufferingState. If/when Player is refacted out, rename this
 
 
 type alias Model =
-    { artists : List Artist
-    , selectedArtist : Maybe Artist
-    , player : Player
+    { player : Player
+    , pageState : PageState
     }
 
 
@@ -186,27 +170,7 @@ type alias Model =
 
 
 init =
-    let
-        spec =
-            Api.connectionSpec "artist"
-                (GraphQL.object SidebarArtist
-                    |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                    |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                    |> GraphQL.with (GraphQL.field "albumCount" [] GraphQL.int)
-                    |> GraphQL.with (GraphQL.field "trackCount" [] GraphQL.int)
-                )
-
-        cmd =
-            (Api.getAlbumArtists spec)
-                |> Api.sendRequest
-                |> Task.attempt GotArtists
-    in
-        ( { artists = []
-          , selectedArtist = Nothing
-          , player = defaultPlayer
-          }
-        , cmd
-        )
+    ( { player = defaultPlayer, pageState = PageLoaded Blank }, Cmd.none )
 
 
 
@@ -224,12 +188,19 @@ type PlayerEvent
     | Reset
 
 
+type PageMsg
+    = AlbumsMsg Page.Album.Msg
+
+
+type PageName
+    = Albums
+
+
 type Msg
     = NoOp
-    | GotArtists (Result GraphQL.Client.Http.Error (Api.Connection SidebarArtist))
-    | ChoseArtist String
-    | GotChosenArtist (Result GraphQL.Client.Http.Error Artist)
-    | ChoseTrack String String
+    | LoadPage PageName
+    | PageInitResponse (Result GraphQL.Client.Http.Error Page)
+    | PageMsg PageMsg
     | PlayerEvent PlayerEvent
     | TogglePlayPause
     | PlayNext
@@ -238,65 +209,39 @@ type Msg
 
 update msg model =
     case Debug.log "msg" msg of
-        GotArtists (Ok artists) ->
-            let
-                artists_ =
-                    List.map .node artists.edges
-            in
-                ( { model | artists = artists_ }, Cmd.none )
+        LoadPage name ->
+            case name of
+                Albums ->
+                    let
+                        ( pageModel, task ) =
+                            Page.Album.init
 
-        ChoseArtist id ->
-            let
-                trackSpec =
-                    GraphQL.object Track
-                        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
-                        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                        cmd =
+                            task |> Task.map Album |> Task.attempt PageInitResponse
+                    in
+                        ( { model | pageState = TransitioningFrom Blank }, cmd )
 
-                albumSpec =
-                    GraphQL.object Album
-                        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                        |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
+        PageInitResponse (Ok page) ->
+            ( { model | pageState = PageLoaded page }, Cmd.none )
 
-                artistSpec =
-                    GraphQL.object Artist
-                        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                        |> GraphQL.with (GraphQL.field "albums" [] (GraphQL.list albumSpec))
+        PageInitResponse (Err err) ->
+            ( model, Cmd.none )
 
-                cmd =
-                    (Api.getArtist id artistSpec)
-                        |> Api.sendRequest
-                        |> Task.attempt GotChosenArtist
-            in
-                ( model, cmd )
+        PageMsg msg ->
+            case model.pageState of
+                TransitioningFrom page ->
+                    let
+                        ( page_, cmd ) =
+                            updatePage msg page
+                    in
+                        ( { model | pageState = TransitioningFrom page_ }, Cmd.map PageMsg cmd )
 
-        GotChosenArtist (Ok artist) ->
-            ( { model | selectedArtist = Just artist }, Cmd.none )
-
-        ChoseTrack albumId trackId ->
-            let
-                maybeAlbum =
-                    model.selectedArtist
-                        |> Maybe.andThen (findAlbum albumId)
-
-                tracks =
-                    List.map (\x -> ( x, None )) <|
-                        case maybeAlbum of
-                            Just album ->
-                                album.tracks
-                                    |> List.Extra.dropWhile (\x -> x.id /= trackId)
-
-                            Nothing ->
-                                []
-
-                player =
-                    model.player
-
-                player_ =
-                    { player | tracks = tracks }
-            in
-                ( { model | player = player_ }, Ports.reset )
+                PageLoaded page ->
+                    let
+                        ( page_, cmd ) =
+                            updatePage msg page
+                    in
+                        ( { model | pageState = PageLoaded page_ }, Cmd.map PageMsg cmd )
 
         PlayerEvent event ->
             let
@@ -330,8 +275,22 @@ update msg model =
             in
                 ( { model | player = player }, cmd )
 
-        _ ->
+        NoOp ->
             ( model, Cmd.none )
+
+
+updatePage : PageMsg -> Page -> ( Page, Cmd PageMsg )
+updatePage msg page =
+    case ( msg, page ) of
+        ( AlbumsMsg msg, Album model ) ->
+            let
+                ( model_, cmd, _ ) =
+                    Page.Album.update msg model
+            in
+                ( Album model_, Cmd.map AlbumsMsg cmd )
+
+        _ ->
+            ( page, Cmd.none )
 
 
 playNextTrack : Player -> ( Player, Cmd Msg )
@@ -515,71 +474,6 @@ subscriptions model =
 -- View
 
 
-viewAlbums model =
-    let
-        viewTrack choseTrackMsg track =
-            div [ class "flex border-bottom pb2 pt1 mb1" ]
-                [ div [ class "flex-auto pointer", onClick (choseTrackMsg track.id) ]
-                    [ text (toString track.position ++ ". " ++ track.name)
-                    ]
-                , div [] [ text "3:49" ]
-                ]
-
-        albumImage album =
-            album.tracks
-                |> List.head
-                |> Maybe.withDefault { id = "", position = 0, name = "" }
-                |> \x -> "http://localhost:4000/image/" ++ x.id
-
-        viewAlbum album =
-            ( album.id
-            , div [ class "flex pb4 album" ]
-                [ div [ class "pr3" ] [ img [ class "fit", src (albumImage album) ] [] ]
-                , div [ class "flex-auto" ]
-                    [ div [ class "h1 pb2" ] [ text album.name ]
-                    , div [] (List.map (viewTrack (ChoseTrack album.id)) album.tracks)
-                    ]
-                ]
-            )
-    in
-        case model.selectedArtist of
-            Just artist ->
-                div []
-                    [ div [ class "h1 pb1 mb3 border-bottom" ] [ text "Jack Johnson" ]
-                    , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
-                    ]
-
-            Nothing ->
-                text ""
-
-
-viewArtist artist =
-    let
-        artistInfo =
-            String.join " "
-                [ toString artist.albumCount
-                , if artist.albumCount == 1 then
-                    "album"
-                  else
-                    "albums"
-                , "-"
-                , toString artist.trackCount
-                , if artist.trackCount == 1 then
-                    "track"
-                  else
-                    "tracks"
-                ]
-    in
-        div [ class "pointer right-align border-bottom" ]
-            [ div
-                [ class "h3 pb1 pt2"
-                , onClick (ChoseArtist artist.id)
-                ]
-                [ text artist.name ]
-            , div [ class "h4 pb1" ] [ text artistInfo ]
-            ]
-
-
 viewNowPlaying player =
     let
         playPauseIcon =
@@ -616,13 +510,14 @@ viewNowPlaying player =
 viewHeader player =
     let
         viewItems =
-            [ "Artists"
-            , "Albums"
-            , "Up Next"
+            [ ( "Artists", Albums )
+            , ( "Albums", Albums )
+            , ( "Up Next", Albums )
             ]
                 |> List.map
-                    (\item ->
-                        li [ class "h3 inline-block m2" ] [ text item ]
+                    (\( item, pageNmae ) ->
+                        li [ class "h3 inline-block m2", onClick (LoadPage pageNmae) ]
+                            [ text item ]
                     )
 
         viewMenu =
@@ -634,12 +529,26 @@ viewHeader player =
             ]
 
 
+viewPage pageState =
+    let
+        page =
+            case pageState of
+                TransitioningFrom page ->
+                    page
+
+                PageLoaded page ->
+                    page
+    in
+        case page of
+            Album model ->
+                Html.map AlbumsMsg <| Page.Album.view model
+
+            Blank ->
+                text ""
+
+
 view model =
     div [ class "viewport" ]
         [ viewHeader model.player
-        , div [ class "main flex" ]
-            [ div [ class "sidebar pr3" ] (List.map viewArtist model.artists)
-            , span [ class "divider mt2 mb2" ] []
-            , div [ class "content flex-auto pl4 pr4 mb4" ] [ viewAlbums model ]
-            ]
+        , Html.map PageMsg <| viewPage model.pageState
         ]
