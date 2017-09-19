@@ -496,7 +496,7 @@ viewAlbums model =
 
 viewArtist artist =
     div
-        [ class "h1 right-align pb2 pt2 pointer border-bottom"
+        [ class "h3 right-align pb2 pt2 pointer border-bottom"
         , onClick (ChoseArtist artist.id)
         ]
         [ text artist.name ]
@@ -519,15 +519,15 @@ viewNowPlaying player =
             Just ( track, _ ) ->
                 div [ class "now-playing flex align-middle" ]
                     [ div [ class "flex controls" ]
-                        [ i [ class "p2 fa fa-backward fa-2x" ] []
+                        [ i [ class "p1 fa fa-backward" ] []
                         , playPauseIcon
-                        , i [ class "p2 fa fa-forward fa-2x" ] []
+                        , i [ class "p1 fa fa-forward", onClick PlayNext ] []
                         ]
                     , img [ class "pr1", src ("http://localhost:4000/image/" ++ track.id) ] []
                     , div [ class "flex flex-column justify-center" ]
-                        [ div [ class "h2 bold" ] [ text track.name ]
-                        , div [ class "h3" ] [ text "Jack Johnson - All the Light Above it Too" ]
-                        , div [ class "h3 bold align-bottom" ] [ text "Up Next: Something Else" ]
+                        [ div [ class "h3 bold" ] [ text track.name ]
+                        , div [ class "h4" ] [ text "Jack Johnson - All the Light Above it Too" ]
+                        , div [ class "h4 bold align-bottom" ] [ text "Up Next: Something Else" ]
                         ]
                     ]
 
@@ -544,13 +544,13 @@ viewHeader player =
             ]
                 |> List.map
                     (\item ->
-                        li [ class "h2 inline-block m3" ] [ text item ]
+                        li [ class "h3 inline-block m2" ] [ text item ]
                     )
 
         viewMenu =
-            ul [ class "ml4 mr4 list-reset" ] viewItems
+            ul [ class "ml2 mr2 list-reset" ] viewItems
     in
-        div [ class "header flex justify-between items-center border-bottom" ]
+        div [ class "header flex pl1 pr1 justify-between items-center border-bottom" ]
             [ viewMenu
             , viewNowPlaying player
             ]
