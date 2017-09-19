@@ -158,6 +158,8 @@ type alias Album =
 type alias SidebarArtist =
     { id : String
     , name : String
+    , albumCount : Int
+    , trackCount : Int
     }
 
 
@@ -190,6 +192,8 @@ init =
                 (GraphQL.object SidebarArtist
                     |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                     |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                    |> GraphQL.with (GraphQL.field "albumCount" [] GraphQL.int)
+                    |> GraphQL.with (GraphQL.field "trackCount" [] GraphQL.int)
                 )
 
         cmd =
@@ -550,11 +554,30 @@ viewAlbums model =
 
 
 viewArtist artist =
-    div
-        [ class "h3 right-align pb2 pt2 pointer border-bottom"
-        , onClick (ChoseArtist artist.id)
-        ]
-        [ text artist.name ]
+    let
+        artistInfo =
+            String.join " "
+                [ toString artist.albumCount
+                , if artist.albumCount == 1 then
+                    "album"
+                  else
+                    "albums"
+                , "-"
+                , toString artist.trackCount
+                , if artist.trackCount == 1 then
+                    "track"
+                  else
+                    "tracks"
+                ]
+    in
+        div [ class "pointer right-align border-bottom" ]
+            [ div
+                [ class "h3 pb1 pt2"
+                , onClick (ChoseArtist artist.id)
+                ]
+                [ text artist.name ]
+            , div [ class "h4 pb1" ] [ text artistInfo ]
+            ]
 
 
 viewNowPlaying player =
