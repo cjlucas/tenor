@@ -47,6 +47,7 @@ type alias Player =
     { currentTime : Float
     , state : PlayerState
     , tracks : List ( Track, BufferingState )
+    , history : List Track
     }
 
 
@@ -54,7 +55,23 @@ defaultPlayer =
     { currentTime = 0
     , state = Stopped
     , tracks = []
+    , history = []
     }
+
+
+popTrack : Player -> Player
+popTrack player =
+    case List.head player.tracks of
+        Just ( track, _ ) ->
+            { player
+                | tracks =
+                    List.tail player.tracks
+                        |> Maybe.withDefault []
+                , history = track :: player.history
+            }
+
+        Nothing ->
+            player
 
 
 isCurrentTrack : String -> Player -> Bool
@@ -212,6 +229,7 @@ type Msg
     | PlayerEvent PlayerEvent
     | TogglePlayPause
     | PlayNext
+    | PlayPrevious
 
 
 update msg model =
@@ -301,6 +319,13 @@ update msg model =
             in
                 ( { model | player = player }, cmd )
 
+        PlayPrevious ->
+            let
+                ( player, cmd ) =
+                    playPreviousTrack model.player
+            in
+                ( { model | player = player }, cmd )
+
         _ ->
             ( model, Cmd.none )
 
@@ -313,17 +338,15 @@ playNextTrack player =
                 |> Maybe.andThen (\( track, _ ) -> Just (Ports.unload track.id))
                 |> Maybe.withDefault Cmd.none
 
-        tracks =
-            List.tail player.tracks |> Maybe.withDefault []
-
         ( player_, primeCmd ) =
-            { player | tracks = tracks }
+            player
+                |> popTrack
                 |> primeTracks
 
         cmd =
             Cmd.batch [ unloadCurrentTrackCmd, primeCmd ]
     in
-        case List.head player_.tracks of
+        case Debug.log "playNextTrack head" (List.head player_.tracks) of
             Just ( track, Loaded ) ->
                 ( player_, Cmd.batch [ cmd, Ports.playId track.id ] )
 
@@ -336,10 +359,42 @@ playNextTrack player =
                 playNextTrack player_
 
             Just ( track, None ) ->
-                ( player_, cmd )
+                ( player_, Ports.load track.id (streamUrl track.id) )
 
             Nothing ->
                 ( player_, cmd )
+
+
+playPreviousTrack player =
+    case List.head player.history of
+        Just track ->
+            let
+                ( player_, unloadCmd ) =
+                    case List.head player.tracks of
+                        Just ( track, _ ) ->
+                            ( updateTrack track.id None player, Ports.unload track.id )
+
+                        Nothing ->
+                            ( player, Cmd.none )
+
+                player__ =
+                    { player_
+                        | tracks = ( track, None ) :: player_.tracks
+                        , history =
+                            List.tail player.history
+                                |> Maybe.withDefault []
+                    }
+
+                cmd =
+                    Cmd.batch
+                        [ unloadCmd
+                        , Ports.load track.id (streamUrl track.id)
+                        ]
+            in
+                ( Debug.log "playPreviousTrack player" player__, cmd )
+
+        Nothing ->
+            ( player, Cmd.none )
 
 
 updatePlayer : PlayerEvent -> Player -> ( Player, Cmd Msg )
@@ -519,7 +574,7 @@ viewNowPlaying player =
             Just ( track, _ ) ->
                 div [ class "now-playing flex align-middle" ]
                     [ div [ class "flex controls" ]
-                        [ i [ class "p1 fa fa-backward" ] []
+                        [ i [ class "p1 fa fa-backward", onClick PlayPrevious ] []
                         , playPauseIcon
                         , i [ class "p1 fa fa-forward", onClick PlayNext ] []
                         ]
