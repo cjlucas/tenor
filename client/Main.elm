@@ -474,7 +474,7 @@ viewAlbums model =
 
 viewArtist artist =
     div
-        [ class "h1 right-align pb2 pointer border-bottom"
+        [ class "h1 right-align pb2 pt2 pointer border-bottom"
         , onClick (ChoseArtist artist.id)
         ]
         [ text artist.name ]
@@ -537,8 +537,9 @@ viewHeader player =
 view model =
     div [ class "viewport" ]
         [ viewHeader model.player
-        , div [ class "main flex pt4" ]
-            [ div [ class "sidebar border-right pr4" ] (List.map viewArtist model.artists)
-            , div [ class "content flex-auto pl4 pr4" ] [ viewAlbums model ]
+        , div [ class "main flex" ]
+            [ div [ class "sidebar pr3" ] (List.map viewArtist model.artists)
+            , span [ class "divider mt2 mb2" ] []
+            , div [ class "content flex-auto pl4 pr4 mb4" ] [ viewAlbums model ]
             ]
         ]
