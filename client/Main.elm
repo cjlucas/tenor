@@ -211,6 +211,7 @@ type Msg
     | ChoseTrack String String
     | PlayerEvent PlayerEvent
     | TogglePlayPause
+    | PlayNext
 
 
 update msg model =
@@ -293,8 +294,52 @@ update msg model =
                 Stopped ->
                     ( model, Cmd.none )
 
+        PlayNext ->
+            let
+                ( player, cmd ) =
+                    playNextTrack model.player
+            in
+                ( { model | player = player }, cmd )
+
         _ ->
             ( model, Cmd.none )
+
+
+playNextTrack : Player -> ( Player, Cmd Msg )
+playNextTrack player =
+    let
+        unloadCurrentTrackCmd =
+            List.head player.tracks
+                |> Maybe.andThen (\( track, _ ) -> Just (Ports.unload track.id))
+                |> Maybe.withDefault Cmd.none
+
+        tracks =
+            List.tail player.tracks |> Maybe.withDefault []
+
+        ( player_, primeCmd ) =
+            { player | tracks = tracks }
+                |> primeTracks
+
+        cmd =
+            Cmd.batch [ unloadCurrentTrackCmd, primeCmd ]
+    in
+        case List.head player_.tracks of
+            Just ( track, Loaded ) ->
+                ( player_, Cmd.batch [ cmd, Ports.playId track.id ] )
+
+            Just ( track, Loading ) ->
+                -- If the current track is still loading, wait for the Load event
+                ( player_, cmd )
+
+            Just ( track, Errored ) ->
+                -- If the head of the playlist had a load error, load the next track
+                playNextTrack player_
+
+            Just ( track, None ) ->
+                ( player_, cmd )
+
+            Nothing ->
+                ( player_, cmd )
 
 
 updatePlayer : PlayerEvent -> Player -> ( Player, Cmd Msg )
@@ -335,38 +380,15 @@ updatePlayer event player =
             ( { player | state = Paused }, Cmd.none )
 
         Stop ->
-            -- TODO: What does this state even do?
+            -- This event fires when a track is unloaded. Currently there
+            -- is no use for it.
             ( player, Cmd.none )
 
         Seek time ->
             ( { player | currentTime = time }, Cmd.none )
 
         End ->
-            let
-                tracks =
-                    List.tail player.tracks |> Maybe.withDefault []
-
-                ( player_, cmd ) =
-                    { player | tracks = tracks }
-                        |> primeTracks
-            in
-                case List.head player_.tracks of
-                    Just ( track, Loaded ) ->
-                        ( player_, Cmd.batch [ cmd, Ports.playId track.id ] )
-
-                    Just ( track, Loading ) ->
-                        -- If the current track is still loading, wait for the Load event
-                        ( player_, cmd )
-
-                    Just ( track, Errored ) ->
-                        -- If the head of the playlist had a load error, load the next track
-                        updatePlayer End player_
-
-                    Just ( track, None ) ->
-                        ( player_, cmd )
-
-                    Nothing ->
-                        ( player_, cmd )
+            playNextTrack player
 
         Reset ->
             case trackToPrime player.tracks of
