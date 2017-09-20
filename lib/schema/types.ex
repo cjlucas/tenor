@@ -27,7 +27,7 @@ defmodule MusicApp.Schema.Types do
         batch({__MODULE__, :album_count}, artist.id, fn results ->
           case Map.fetch(results, artist.id) do
             {:ok, cnt} -> {:ok, cnt}
-            :error     -> {:error, "Failed to resolve album count"}
+            :error     -> {:ok, 0}
           end
         end)
       end
@@ -38,7 +38,7 @@ defmodule MusicApp.Schema.Types do
         batch({__MODULE__, :track_count}, artist.id, fn results ->
           case Map.fetch(results, artist.id) do
             {:ok, cnt} -> {:ok, cnt}
-            :error     -> {:error, "Failed to resolve album count"}
+            :error     -> {:ok, 0}
           end
         end)
       end
