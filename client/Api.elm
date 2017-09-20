@@ -97,3 +97,11 @@ getArtist id outSpec =
                 )
     in
         Query docSpec args
+
+
+getAlbums outSpec =
+    let
+        docSpec =
+            extract (field "albums" [] (list outSpec))
+    in
+        Query docSpec {}

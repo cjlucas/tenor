@@ -69,6 +69,12 @@ defmodule MusicApp.Schema do
         {:ok, Repo.get(Artist, id)}
       end
     end
+
+    field :albums, list_of(:album) do
+      resolve fn _args, _ctx ->
+        {:ok, Repo.all(Album)}
+      end
+    end
   end
 
   defp encode_cursor(key, val) do

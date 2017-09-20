@@ -12,6 +12,7 @@ import Ports
 import Json.Decode as Decode
 import List.Extra
 import Page.Artists
+import Page.Albums
 import Route exposing (Route)
 
 
@@ -153,6 +154,7 @@ type alias Track =
 type Page
     = Blank
     | Artists Page.Artists.Model
+    | Albums Page.Albums.Model
 
 
 type PageState
@@ -200,6 +202,7 @@ type PlayerEvent
 
 type PageMsg
     = ArtistsMsg Page.Artists.Msg
+    | AlbumsMsg Page.Albums.Msg
 
 
 type Msg
@@ -224,6 +227,16 @@ update msg model =
 
                         cmd =
                             task |> Task.map Artists |> Task.attempt PageInitResponse
+                    in
+                        ( { model | pageState = TransitioningFrom Blank }, cmd )
+
+                Route.Albums ->
+                    let
+                        ( pageModel, task ) =
+                            Page.Albums.init
+
+                        cmd =
+                            task |> Task.map Albums |> Task.attempt PageInitResponse
                     in
                         ( { model | pageState = TransitioningFrom Blank }, cmd )
 
@@ -537,7 +550,7 @@ viewHeader player =
     let
         viewItems =
             [ ( "Artists", Route.Artists )
-            , ( "Albums", Route.Artists )
+            , ( "Albums", Route.Albums )
             , ( "Up Next", Route.Artists )
             ]
                 |> List.map
@@ -568,6 +581,9 @@ viewPage pageState =
         case page of
             Artists model ->
                 Html.map ArtistsMsg <| Page.Artists.view model
+
+            Albums model ->
+                Html.map AlbumsMsg <| Page.Albums.view model
 
             Blank ->
                 text ""

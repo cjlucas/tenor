@@ -49,6 +49,7 @@ defmodule MusicApp.Schema.Types do
     field :id, :id
     field :name, :string
 
+    field :artist, :artist, resolve: assoc(:artist)
     field :tracks, list_of(:track), resolve: assoc(:tracks)
     field :discs, list_of(:disc), resolve: assoc(:discs)
   end
