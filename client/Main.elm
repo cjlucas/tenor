@@ -165,6 +165,15 @@ type alias Model =
     }
 
 
+currentPage model =
+    case model.pageState of
+        TransitioningFrom page ->
+            page
+
+        PageLoaded page ->
+            page
+
+
 
 -- Init
 
@@ -228,20 +237,19 @@ update msg model =
             ( model, Cmd.none )
 
         PageMsg msg ->
-            case model.pageState of
-                TransitioningFrom page ->
-                    let
-                        ( page_, cmd ) =
-                            updatePage msg page
-                    in
-                        ( { model | pageState = TransitioningFrom page_ }, Cmd.map PageMsg cmd )
+            let
+                ( page, model_, cmd ) =
+                    updatePage msg (currentPage model) model
 
-                PageLoaded page ->
-                    let
-                        ( page_, cmd ) =
-                            updatePage msg page
-                    in
-                        ( { model | pageState = PageLoaded page_ }, Cmd.map PageMsg cmd )
+                pageState =
+                    case model.pageState of
+                        TransitioningFrom _ ->
+                            TransitioningFrom page
+
+                        PageLoaded _ ->
+                            PageLoaded page
+            in
+                ( { model_ | pageState = pageState }, cmd )
 
         PlayerEvent event ->
             let
@@ -279,18 +287,39 @@ update msg model =
             ( model, Cmd.none )
 
 
-updatePage : PageMsg -> Page -> ( Page, Cmd PageMsg )
-updatePage msg page =
+updatePage : PageMsg -> Page -> Model -> ( Page, Model, Cmd Msg )
+updatePage msg page model =
     case ( msg, page ) of
-        ( AlbumsMsg msg, Album model ) ->
+        ( AlbumsMsg msg, Album pageModel ) ->
             let
-                ( model_, cmd, _ ) =
-                    Page.Album.update msg model
+                ( pageModel_, pageCmd, outMsg ) =
+                    Page.Album.update msg pageModel
+
+                ( model_, cmd ) =
+                    case outMsg of
+                        Just (Page.Album.UpdatePlaylist tracks) ->
+                            let
+                                player =
+                                    model.player
+
+                                player_ =
+                                    { player | tracks = List.map (\track -> ( track, None )) tracks }
+                            in
+                                ( { model | player = player_ }, Ports.reset )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                batchCmd =
+                    Cmd.batch
+                        [ Cmd.map PageMsg <| Cmd.map AlbumsMsg pageCmd
+                        , cmd
+                        ]
             in
-                ( Album model_, Cmd.map AlbumsMsg cmd )
+                ( Album pageModel_, model_, batchCmd )
 
         _ ->
-            ( page, Cmd.none )
+            ( page, model, Cmd.none )
 
 
 playNextTrack : Player -> ( Player, Cmd Msg )
