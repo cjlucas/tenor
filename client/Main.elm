@@ -11,7 +11,8 @@ import GraphQL.Client.Http
 import Ports
 import Json.Decode as Decode
 import List.Extra
-import Page.Album
+import Page.Artists
+import Route exposing (Route)
 
 
 streamUrl id =
@@ -151,7 +152,7 @@ type alias Track =
 
 type Page
     = Blank
-    | Album Page.Album.Model
+    | Artists Page.Artists.Model
 
 
 type PageState
@@ -198,16 +199,12 @@ type PlayerEvent
 
 
 type PageMsg
-    = AlbumsMsg Page.Album.Msg
-
-
-type PageName
-    = Albums
+    = ArtistsMsg Page.Artists.Msg
 
 
 type Msg
     = NoOp
-    | LoadPage PageName
+    | LoadPage Route
     | PageInitResponse (Result GraphQL.Client.Http.Error Page)
     | PageMsg PageMsg
     | PlayerEvent PlayerEvent
@@ -220,13 +217,13 @@ update msg model =
     case Debug.log "msg" msg of
         LoadPage name ->
             case name of
-                Albums ->
+                Route.Artists ->
                     let
                         ( pageModel, task ) =
-                            Page.Album.init
+                            Page.Artists.init
 
                         cmd =
-                            task |> Task.map Album |> Task.attempt PageInitResponse
+                            task |> Task.map Artists |> Task.attempt PageInitResponse
                     in
                         ( { model | pageState = TransitioningFrom Blank }, cmd )
 
@@ -290,14 +287,14 @@ update msg model =
 updatePage : PageMsg -> Page -> Model -> ( Page, Model, Cmd Msg )
 updatePage msg page model =
     case ( msg, page ) of
-        ( AlbumsMsg msg, Album pageModel ) ->
+        ( ArtistsMsg msg, Artists pageModel ) ->
             let
                 ( pageModel_, pageCmd, outMsg ) =
-                    Page.Album.update msg pageModel
+                    Page.Artists.update msg pageModel
 
                 ( model_, cmd ) =
                     case outMsg of
-                        Just (Page.Album.UpdatePlaylist tracks) ->
+                        Just (Page.Artists.UpdatePlaylist tracks) ->
                             let
                                 player =
                                     model.player
@@ -312,11 +309,11 @@ updatePage msg page model =
 
                 batchCmd =
                     Cmd.batch
-                        [ Cmd.map PageMsg <| Cmd.map AlbumsMsg pageCmd
+                        [ Cmd.map PageMsg <| Cmd.map ArtistsMsg pageCmd
                         , cmd
                         ]
             in
-                ( Album pageModel_, model_, batchCmd )
+                ( Artists pageModel_, model_, batchCmd )
 
         _ ->
             ( page, model, Cmd.none )
@@ -539,9 +536,9 @@ viewNowPlaying player =
 viewHeader player =
     let
         viewItems =
-            [ ( "Artists", Albums )
-            , ( "Albums", Albums )
-            , ( "Up Next", Albums )
+            [ ( "Artists", Route.Artists )
+            , ( "Albums", Route.Artists )
+            , ( "Up Next", Route.Artists )
             ]
                 |> List.map
                     (\( item, pageNmae ) ->
@@ -569,8 +566,8 @@ viewPage pageState =
                     page
     in
         case page of
-            Album model ->
-                Html.map AlbumsMsg <| Page.Album.view model
+            Artists model ->
+                Html.map ArtistsMsg <| Page.Artists.view model
 
             Blank ->
                 text ""

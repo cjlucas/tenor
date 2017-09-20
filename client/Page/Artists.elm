@@ -1,4 +1,4 @@
-module Page.Album exposing (Model, OutMsg(..), Msg, init, update, view)
+module Page.Artists exposing (Model, OutMsg(..), Msg, init, update, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
