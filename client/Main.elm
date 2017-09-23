@@ -297,6 +297,18 @@ update msg model =
             ( model, Cmd.none )
 
 
+resetPlayerWithTracks : List Track -> Model -> ( Model, Cmd Msg )
+resetPlayerWithTracks tracks model =
+    let
+        player =
+            model.player
+
+        player_ =
+            { player | tracks = List.map (\track -> ( track, None )) tracks }
+    in
+        ( { model | player = player_ }, Ports.reset )
+
+
 updatePage : PageMsg -> Page -> Model -> ( Page, Model, Cmd Msg )
 updatePage msg page model =
     case ( msg, page ) of
@@ -308,14 +320,7 @@ updatePage msg page model =
                 ( model_, cmd ) =
                     case outMsg of
                         Just (Page.Artists.UpdatePlaylist tracks) ->
-                            let
-                                player =
-                                    model.player
-
-                                player_ =
-                                    { player | tracks = List.map (\track -> ( track, None )) tracks }
-                            in
-                                ( { model | player = player_ }, Ports.reset )
+                            resetPlayerWithTracks tracks model
 
                         Nothing ->
                             ( model, Cmd.none )
@@ -327,6 +332,27 @@ updatePage msg page model =
                         ]
             in
                 ( Artists pageModel_, model_, batchCmd )
+
+        ( AlbumsMsg msg, Albums pageModel ) ->
+            let
+                ( pageModel_, pageCmd, outMsg ) =
+                    Page.Albums.update msg pageModel
+
+                ( model_, resetCmd ) =
+                    case outMsg of
+                        Just (Page.Albums.UpdatePlaylist tracks) ->
+                            resetPlayerWithTracks tracks model
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                cmd =
+                    Cmd.batch
+                        [ Cmd.map PageMsg <| Cmd.map AlbumsMsg pageCmd
+                        , resetCmd
+                        ]
+            in
+                ( Albums pageModel_, model_, cmd )
 
         _ ->
             ( page, model, Cmd.none )

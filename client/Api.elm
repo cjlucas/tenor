@@ -105,3 +105,22 @@ getAlbums outSpec =
             extract (field "albums" [] (list outSpec))
     in
         Query docSpec {}
+
+
+getAlbum id outSpec =
+    let
+        idVar =
+            Var.required "id" .id Var.string
+
+        args =
+            { id = id }
+
+        docSpec =
+            extract
+                (field "album"
+                    [ ( "id", Arg.variable idVar )
+                    ]
+                    outSpec
+                )
+    in
+        Query docSpec args
