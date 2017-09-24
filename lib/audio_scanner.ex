@@ -2,7 +2,7 @@ defmodule AudioScanner do
   use Task
 
   alias AudioTag.ID3v2.Frame.{Text, APIC}
-  alias MusicApp.{Repo, Artist, Album, Disc, Track}
+  alias MusicApp.{Repo, Artist, Album, Disc, Track, Image}
 
   def start_link(dir) do
     Task.start_link(__MODULE__, :run, [dir])
@@ -21,7 +21,7 @@ defmodule AudioScanner do
       disc_position: 1,
       total_discs: nil,
       disc_name: nil,
-      images: [],
+      image: nil,
     }
 
     dir
@@ -74,7 +74,11 @@ defmodule AudioScanner do
                 m = split_id3_pos(text, [:disc_position, :total_discs])
                 Map.merge(track, m)
               %APIC{} ->
-                %{track | images: [frame | track.images]}
+                if is_nil(track[:image]) do
+                  %{track | image: frame}
+                else
+                  track
+                end
               _ ->
                 track
             end
@@ -103,7 +107,34 @@ defmodule AudioScanner do
           nil -> nil
           track -> track.id
         end
-      
+
+      image_id =
+        if !is_nil(track[:image]) do
+          %{mime_type: mime_type, data: data} = track[:image]
+
+          img_checksum = :crypto.hash(:md5, data) 
+                         |> MusicApp.Utils.binary_to_hex
+
+          case Repo.get_by(Image, checksum: img_checksum) do
+            %Image{id: id} ->
+              id
+            nil ->
+              params = %{mime_type: mime_type, checksum: img_checksum}
+              case Image.changeset(%Image{}, params) |> Repo.insert do
+                {:ok, %Image{id: id}} -> 
+                  fpath = Path.join([".images", 
+                                  String.first(img_checksum),
+                                  img_checksum])
+
+                  Path.dirname(fpath) |> File.mkdir_p!
+                  File.write!(fpath, data)
+                  id
+                _ -> 
+                  nil
+              end
+          end
+        end
+
       {:ok, artist} = 
         Repo.Artist.insert_if_not_exists(%{name: track.artist})
 
@@ -131,6 +162,7 @@ defmodule AudioScanner do
           album_artist_id: album_artist.id,
           album_id: album.id,
           disc_id: disc.id,
+          image_id: image_id,
         })
 
       fun = if track_id == nil do

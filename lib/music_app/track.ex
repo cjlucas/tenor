@@ -14,10 +14,11 @@ defmodule MusicApp.Track do
     belongs_to :album_artist, MusicApp.Artist
     belongs_to :album, MusicApp.Album
     belongs_to :disc, MusicApp.Disc
+    belongs_to :image, MusicApp.Image
   end
 
   def changeset(track, params \\ %{}) do
     track
-    |> cast(params, [:name, :position, :total_tracks, :release_date, :file_id, :album_artist_id, :artist_id, :album_id, :disc_id])
+    |> cast(params, [:name, :position, :total_tracks, :release_date, :file_id, :album_artist_id, :artist_id, :album_id, :disc_id, :image_id])
   end
 end

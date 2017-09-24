@@ -52,6 +52,29 @@ defmodule MusicApp.Schema.Types do
     field :artist, :artist, resolve: assoc(:artist)
     field :tracks, list_of(:track), resolve: assoc(:tracks)
     field :discs, list_of(:disc), resolve: assoc(:discs)
+
+    field :image_id, :id do
+      resolve fn album, _, _ ->
+        query = from t in MusicApp.Track,
+          select: t.image_id,
+          where: t.album_id == ^album.id,
+          limit: 1
+
+        {:ok, MusicApp.Repo.one(query)}
+      end
+    end
+    
+    field :image, :image do
+      resolve fn album, _, _ ->
+        query = from t in MusicApp.Track,
+          join: img in assoc(t, :image),
+          select: img,
+          where: t.album_id == ^album.id,
+          limit: 1
+
+        {:ok, MusicApp.Repo.one(query)}
+      end
+    end
   end
 
   object :disc do
@@ -82,6 +105,9 @@ defmodule MusicApp.Schema.Types do
 
     field :disc_id, :id
     field :disc, :disc, resolve: assoc(:disc)
+
+    field :image_id, :id
+    field :image, :image, resolve: assoc(:image)
   end
 
   def album_count(_, artist_ids) do
@@ -106,5 +132,11 @@ defmodule MusicApp.Schema.Types do
     )
 
     MusicApp.Repo.all(query) |> Map.new(&List.to_tuple/1)
+  end
+
+  object :image do
+    field :id, :id
+
+    field :mime_type, :string
   end
 end
