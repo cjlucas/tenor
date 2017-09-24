@@ -8,7 +8,7 @@ defmodule MusicApp.Schema do
   alias MusicApp.Repo
 
   import_types MusicApp.Schema.Types
-  
+
   object :artist_connection do
     field :edges, list_of(:artist_edge)
     field :end_cursor, :string
@@ -17,6 +17,16 @@ defmodule MusicApp.Schema do
   object :artist_edge do
     field :cursor, :string
     field :artist, :artist
+  end
+
+  object :album_connection do
+    field :edges, list_of(:album_edge)
+    field :end_cursor, :string
+  end
+
+  object :album_edge do
+    field :cursor, :string
+    field :album, :album
   end
 
   query do
@@ -70,9 +80,41 @@ defmodule MusicApp.Schema do
       end
     end
 
-    field :albums, list_of(:album) do
-      resolve fn _args, _ctx ->
-        {:ok, Repo.all(Album)}
+    field :albums, :album_connection do
+      arg :limit, :integer
+      arg :after, :string
+
+      resolve fn args, _ctx ->
+        limit = args[:limit] || 50
+
+        query = 
+          from(
+            album in Album, 
+            limit: ^limit, 
+            order_by: album.name
+          )
+          
+        query =
+          if args[:after] do
+            {:ok, [key, name]} = decode_cursor(args[:after])
+            query |> where([a], a.name > ^name)
+          else
+            query
+          end
+            
+          edges = 
+            query
+            |> Repo.all
+            |> Enum.map(fn album ->
+              %{cursor: encode_cursor(:name, album.name), album: album}
+            end)
+
+        end_cursor = 
+          edges 
+          |> Enum.map(&Map.fetch!(&1, :cursor))
+          |> List.last
+
+        {:ok, %{edges: edges, end_cursor: end_cursor}}
       end
     end
     
@@ -91,6 +133,6 @@ defmodule MusicApp.Schema do
 
   defp decode_cursor(cursor) do
     with {:ok, cursor} <- Base.decode64(cursor),
-      do: {:ok, String.split(cursor, ":")}
+      do: {:ok, String.split(cursor, ":", parts: 2)}
   end
 end

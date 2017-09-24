@@ -9,6 +9,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode
 import List.Extra
+import InfiniteScroll as IS
 
 
 -- Model
@@ -57,6 +58,7 @@ albumSpec =
 type alias Model =
     { albums : List BasicAlbum
     , selectedAlbum : Maybe Album
+    , infiniteScroll : IS.Model Msg
     }
 
 
@@ -66,22 +68,27 @@ type alias Model =
 
 init =
     let
-        fromArtist f =
-            GraphQL.field "artist" [] (GraphQL.extract f)
-
-        albumSpec =
-            GraphQL.object BasicAlbum
-                |> GraphQL.with (GraphQL.field "id" [] GraphQL.string)
-                |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
-
         model =
-            { albums = [], selectedAlbum = Nothing }
+            { albums = []
+            , selectedAlbum = Nothing
+            , infiniteScroll = IS.init (loadAlbums 50 Nothing) |> IS.offset 2000
+            }
 
         task =
-            Api.getAlbums albumSpec
-                |> Api.sendRequest
-                |> Task.andThen (\albums -> Task.succeed { model | albums = albums })
+            loadAlbumsTask 50 Nothing
+                |> Task.andThen
+                    (\connection ->
+                        let
+                            is =
+                                model.infiniteScroll
+                                    |> IS.loadMoreCmd (loadAlbums 50 (Just connection.endCursor))
+                        in
+                            Task.succeed
+                                { model
+                                    | albums = List.map .node connection.edges
+                                    , infiniteScroll = is
+                                }
+                    )
     in
         ( model, task )
 
@@ -96,14 +103,56 @@ type OutMsg
 
 type Msg
     = NoOp
+    | FetchedAlbums (Result GraphQL.Client.Http.Error (Api.Connection BasicAlbum))
     | SelectedAlbum String
     | GotSelectedAlbum (Result GraphQL.Client.Http.Error Album)
     | SelectedTrack String
     | DismissModal
+    | InfiniteScrollMsg IS.Msg
+
+
+loadAlbumsTask : Int -> Maybe String -> Task GraphQL.Client.Http.Error (Api.Connection BasicAlbum)
+loadAlbumsTask limit maybeCursor =
+    let
+        fromArtist f =
+            GraphQL.field "artist" [] (GraphQL.extract f)
+
+        albumSpec =
+            GraphQL.object BasicAlbum
+                |> GraphQL.with (GraphQL.field "id" [] GraphQL.string)
+                |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+
+        connectionSpec =
+            Api.connectionSpec "album" albumSpec
+    in
+        Api.getAlbums limit maybeCursor connectionSpec
+            |> Api.sendRequest
+
+
+loadAlbums : Int -> Maybe String -> IS.Direction -> Cmd Msg
+loadAlbums limit maybeCursor _ =
+    loadAlbumsTask limit maybeCursor
+        |> Task.attempt FetchedAlbums
 
 
 update msg model =
     case msg of
+        FetchedAlbums (Ok connection) ->
+            let
+                is =
+                    model.infiniteScroll
+                        |> IS.stopLoading
+                        |> IS.loadMoreCmd (loadAlbums 50 (Just connection.endCursor))
+
+                albums =
+                    model.albums ++ (List.map .node connection.edges)
+            in
+                ( { model | albums = albums, infiniteScroll = is }, Cmd.none, Nothing )
+
+        FetchedAlbums (Err err) ->
+            ( model, Cmd.none, Nothing )
+
         SelectedAlbum id ->
             let
                 cmd =
@@ -135,6 +184,16 @@ update msg model =
         DismissModal ->
             ( { model | selectedAlbum = Nothing }, Cmd.none, Nothing )
 
+        InfiniteScrollMsg msg ->
+            let
+                ( is, cmd ) =
+                    IS.update
+                        InfiniteScrollMsg
+                        msg
+                        model.infiniteScroll
+            in
+                ( { model | infiniteScroll = is }, cmd, Nothing )
+
         NoOp ->
             ( model, Cmd.none, Nothing )
 
@@ -144,7 +203,7 @@ update msg model =
 
 
 viewAlbum album =
-    div [ class "col sm-col-4 md-col-3 lg-col-2 pl2 pr2 mb4", onClick (SelectedAlbum album.id) ]
+    div [ class "col sm-col-6 md-col-4 lg-col-3 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
         [ img [ class "fit", src "http://localhost:4000/image/4ded4fe6-08e2-4ca0-a44c-876450b2806b" ] []
         , div [ class "h3 bold" ] [ text album.name ]
         , div [ class "h4" ] [ text album.artistName ]
@@ -200,4 +259,8 @@ viewModal album =
 
 
 view model =
-    div [ class "main content flex flex-wrap" ] ((viewModal model.selectedAlbum) :: (List.map viewAlbum model.albums))
+    div
+        [ class "main content flex flex-wrap mx-auto"
+        , IS.infiniteScroll InfiniteScrollMsg
+        ]
+        ((viewModal model.selectedAlbum) :: (List.map viewAlbum model.albums))
