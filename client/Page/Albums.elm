@@ -18,6 +18,7 @@ import InfiniteScroll as IS
 type alias BasicAlbum =
     { id : String
     , name : String
+    , imageId : Maybe String
     , artistName : String
     }
 
@@ -26,12 +27,14 @@ type alias Track =
     { id : String
     , position : Int
     , name : String
+    , imageId : Maybe String
     }
 
 
 type alias Album =
     { id : String
     , name : String
+    , imageId : Maybe String
     , artistName : String
     , tracks : List Track
     }
@@ -47,10 +50,12 @@ albumSpec =
                 |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                 |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
                 |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
     in
         GraphQL.object Album
             |> GraphQL.with (GraphQL.field "id" [] GraphQL.string)
             |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
             |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
             |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
 
@@ -121,6 +126,7 @@ loadAlbumsTask limit maybeCursor =
             GraphQL.object BasicAlbum
                 |> GraphQL.with (GraphQL.field "id" [] GraphQL.string)
                 |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
                 |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
 
         connectionSpec =
@@ -202,12 +208,25 @@ update msg model =
 -- View
 
 
+albumUrl id =
+    "http://localhost:4000/image/" ++ id
+
+
 viewAlbum album =
-    div [ class "col sm-col-6 md-col-4 lg-col-3 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
-        [ img [ class "fit", src "http://localhost:4000/image/4ded4fe6-08e2-4ca0-a44c-876450b2806b" ] []
-        , div [ class "h3 bold" ] [ text album.name ]
-        , div [ class "h4" ] [ text album.artistName ]
-        ]
+    let
+        albumImg =
+            case album.imageId of
+                Just id ->
+                    img [ class "fit", src (albumUrl id) ] []
+
+                Nothing ->
+                    text ""
+    in
+        div [ class "col sm-col-6 md-col-4 lg-col-3 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
+            [ albumImg
+            , div [ class "h3 bold" ] [ text album.name ]
+            , div [ class "h4" ] [ text album.artistName ]
+            ]
 
 
 onClickStopProp msg =
@@ -217,11 +236,13 @@ onClickStopProp msg =
 viewModal : Maybe Album -> Html Msg
 viewModal album =
     let
-        albumImage album =
-            album.tracks
-                |> List.head
-                |> Maybe.withDefault { id = "", position = 0, name = "" }
-                |> \x -> "http://localhost:4000/image/" ++ x.id
+        albumImg album =
+            case album.imageId of
+                Just id ->
+                    img [ class "fit", src (albumUrl id) ] []
+
+                Nothing ->
+                    text ""
 
         viewTrack track =
             div [ class "flex border-bottom pb2 pt1 mb1", onClick (SelectedTrack track.id) ]
@@ -236,7 +257,7 @@ viewModal album =
                 Just album ->
                     div [ class "modal-content p3", onClickStopProp NoOp ]
                         [ div [ class "flex pb2" ]
-                            [ img [ class "fit pr2", src (albumImage album) ] []
+                            [ albumImg album
                             , div [ class "flex-auto" ]
                                 [ div [ class "h1 pb1" ]
                                     [ text album.name ]

@@ -148,6 +148,7 @@ type alias Track =
     { id : String
     , position : Int
     , name : String
+    , imageId : Maybe String
     }
 
 
@@ -554,19 +555,28 @@ viewNowPlaying player =
     in
         case List.head player.tracks of
             Just ( track, _ ) ->
-                div [ class "now-playing flex align-middle" ]
-                    [ div [ class "flex controls" ]
-                        [ i [ class "p1 fa fa-backward", onClick PlayPrevious ] []
-                        , playPauseIcon
-                        , i [ class "p1 fa fa-forward", onClick PlayNext ] []
+                let
+                    image =
+                        case track.imageId of
+                            Just id ->
+                                img [ class "pr1", src ("http://localhost:4000/image/" ++ id) ] []
+
+                            Nothing ->
+                                text ""
+                in
+                    div [ class "now-playing flex align-middle" ]
+                        [ div [ class "flex controls" ]
+                            [ i [ class "p1 fa fa-backward", onClick PlayPrevious ] []
+                            , playPauseIcon
+                            , i [ class "p1 fa fa-forward", onClick PlayNext ] []
+                            ]
+                        , image
+                        , div [ class "flex flex-column justify-center" ]
+                            [ div [ class "h4 bold" ] [ text track.name ]
+                            , div [ class "h5" ] [ text "Jack Johnson - All the Light Above it Too" ]
+                            , div [ class "h5 bold align-bottom" ] [ text "Up Next: Something Else" ]
+                            ]
                         ]
-                    , img [ class "pr1", src ("http://localhost:4000/image/" ++ track.id) ] []
-                    , div [ class "flex flex-column justify-center" ]
-                        [ div [ class "h4 bold" ] [ text track.name ]
-                        , div [ class "h5" ] [ text "Jack Johnson - All the Light Above it Too" ]
-                        , div [ class "h5 bold align-bottom" ] [ text "Up Next: Something Else" ]
-                        ]
-                    ]
 
             Nothing ->
                 text ""

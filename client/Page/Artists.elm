@@ -18,12 +18,14 @@ type alias Track =
     { id : String
     , position : Int
     , name : String
+    , imageId : Maybe String
     }
 
 
 type alias Album =
     { id : String
     , name : String
+    , imageId : Maybe String
     , tracks : List Track
     }
 
@@ -110,11 +112,13 @@ update msg model =
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                         |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
                         |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
 
                 albumSpec =
                     GraphQL.object Album
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                         |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
                         |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
 
                 artistSpec =
@@ -168,15 +172,17 @@ viewAlbums model =
                 ]
 
         albumImage album =
-            album.tracks
-                |> List.head
-                |> Maybe.withDefault { id = "", position = 0, name = "" }
-                |> \x -> "http://localhost:4000/image/" ++ x.id
+            case album.imageId of
+                Just id ->
+                    img [ class "fit", src ("http://localhost:4000/image/" ++ id) ] []
+
+                Nothing ->
+                    text ""
 
         viewAlbum album =
             ( album.id
             , div [ class "flex pb4 album" ]
-                [ div [ class "pr3" ] [ img [ class "fit", src (albumImage album) ] [] ]
+                [ div [ class "pr3" ] [ albumImage album ]
                 , div [ class "flex-auto" ]
                     [ div [ class "h1 pb2" ] [ text album.name ]
                     , div [] (List.map (viewTrack (SelectedTrack album.id)) album.tracks)
