@@ -217,7 +217,11 @@ viewAlbum album =
         albumImg =
             case album.imageId of
                 Just id ->
-                    img [ class "fit", src (albumUrl id) ] []
+                    img
+                        [ style [ ( "width", "100%" ) ]
+                        , src (albumUrl id)
+                        ]
+                        []
 
                 Nothing ->
                     text ""
@@ -239,7 +243,7 @@ viewModal album =
         albumImg album =
             case album.imageId of
                 Just id ->
-                    img [ class "fit", src (albumUrl id) ] []
+                    img [ class "fit pr2", src (albumUrl id) ] []
 
                 Nothing ->
                     text ""
