@@ -10,6 +10,7 @@ import Html.Events exposing (..)
 import Json.Decode
 import List.Extra
 import InfiniteScroll as IS
+import Utils
 
 
 -- Model
@@ -26,6 +27,7 @@ type alias BasicAlbum =
 type alias Track =
     { id : String
     , position : Int
+    , duration : Float
     , name : String
     , imageId : Maybe String
     }
@@ -49,6 +51,7 @@ albumSpec =
             GraphQL.object Track
                 |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                 |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+                |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
                 |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
                 |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
     in
@@ -249,12 +252,16 @@ viewModal album =
                     text ""
 
         viewTrack track =
-            div [ class "flex border-bottom pb2 pt1 mb1", onClick (SelectedTrack track.id) ]
-                [ div [ class "flex-auto pointer" ]
-                    [ text (toString track.position ++ ". " ++ track.name)
+            let
+                duration =
+                    track.duration |> truncate |> Utils.durationText
+            in
+                div [ class "flex border-bottom pb2 pt1 mb1", onClick (SelectedTrack track.id) ]
+                    [ div [ class "flex-auto pointer" ]
+                        [ text (toString track.position ++ ". " ++ track.name)
+                        ]
+                    , div [] [ text duration ]
                     ]
-                , div [] [ text "3:49" ]
-                ]
 
         viewContent =
             case album of

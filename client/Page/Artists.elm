@@ -9,6 +9,7 @@ import GraphQL.Request.Builder as GraphQL
 import GraphQL.Client.Http
 import Task exposing (Task)
 import List.Extra
+import Utils
 
 
 -- Model
@@ -17,6 +18,7 @@ import List.Extra
 type alias Track =
     { id : String
     , position : Int
+    , duration : Float
     , name : String
     , imageId : Maybe String
     }
@@ -111,6 +113,7 @@ update msg model =
                     GraphQL.object Track
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                         |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+                        |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
                         |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
                         |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
 
@@ -163,12 +166,15 @@ update msg model =
 
 viewAlbums model =
     let
+        duration track =
+            track.duration |> truncate |> Utils.durationText
+
         viewTrack choseTrackMsg track =
             div [ class "flex border-bottom pb2 pt1 mb1" ]
                 [ div [ class "flex-auto pointer", onClick (choseTrackMsg track.id) ]
                     [ text (toString track.position ++ ". " ++ track.name)
                     ]
-                , div [] [ text "3:49" ]
+                , div [] [ text (duration track) ]
                 ]
 
         albumImage album =
