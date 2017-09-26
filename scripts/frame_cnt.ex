@@ -30,4 +30,7 @@ fpath = "/Users/chris/Downloads/01 Jack Johnson - Subplots.mp3"
 #FrameCount.doit(data)
 
 
-System.argv |> Enum.map(&AudioTag.MP3.parse/1) |> Enum.map(&length/1) |> Enum.each(&IO.puts/1)
+System.argv 
+|> Enum.map(&AudioTag.Parser.parse!/1)
+|> Enum.map(&length/1) 
+|> Enum.each(&IO.puts/1)

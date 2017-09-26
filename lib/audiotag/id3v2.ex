@@ -10,20 +10,37 @@ defmodule AudioTag.ID3v2 do
             (n &&& 0x7F)
   end
 
-  def read(data) do
-    parse_header(data)
+  def matches?(reader) do
+    case AudioTag.FileReader.peek(reader, 4) do
+      {:ok, <<"ID3", vzn::8>>} when vzn in [3, 4] -> true
+      _ -> false
+    end
   end
 
-  def parse_header(<<"ID3", version, 0, flags::8, size::32, rest::binary>>) do
-    config = if version == 4 do
-      %{frame_size_fun: &syncsafe/1}
-    else
-      %{frame_size_fun: fn i -> i end}
+  def parse(reader) do
+    case AudioTag.FileReader.read(reader, 10) do
+      {:ok, hdr} ->
+        <<"ID3", version, 0, flags::8, size::32>> = hdr
+
+        config = 
+          if version == 4 do
+            %{frame_size_fun: &syncsafe/1}
+          else
+            %{frame_size_fun: fn i -> i end}
+          end
+    
+        size = syncsafe(size)
+        case AudioTag.FileReader.read(reader, size) do
+          {:ok, data} ->
+            read_frames(data, config)
+          :eof ->
+            :eof
+        end
+      :eof ->
+        nil
     end
 
-    size = syncsafe(size)
-    <<frame_data::bytes-size(size), _::binary>> = rest
-    read_frames(frame_data, config)
+
   end
 
   def read_frames(buf, config) do

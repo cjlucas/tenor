@@ -74,44 +74,27 @@ defmodule AudioTag.MP3 do
 
   @header_size_bytes 4
 
-  def parse(fpath) do
-    {:ok, pid} = File.open(fpath, [:binary])
-
-    parse_file(pid, 0, [], <<>>)
-  end
-
-  defp parse_file(pid, offset, acc, buf) when byte_size(buf) < 4 do
-    case fill_buffer(pid, buf, 4) do
-      data when is_binary(data) ->
-        parse_file(pid, offset, acc, data)
-      :eof ->
-        acc
+  def matches?(reader) do
+    case AudioTag.FileReader.peek(reader, 2) do
+      {:ok, <<255, 7::3, vzn::2, layer::2, _::1>>} when vzn != 1 and layer != 0 ->
+        true
+      _ ->
+        false
     end
   end
-  defp parse_file(pid, offset, acc, buf) do
-    case find_header(buf) do
-      data when byte_size(data) >= 4 ->
-        offset = offset + byte_size(buf) - byte_size(data)
 
-        <<hdr_data::bytes-size(4), rest::binary>> = data
-        hdr = parse_frame(hdr_data)
-        hdr = %{hdr | byte_offset: offset}
-        offset = offset + 4
-
+  def parse(reader) do
+    case AudioTag.FileReader.read(reader, 4) do
+      {:ok, data} ->
+        hdr = parse_frame(data)
         len = Header.frame_length(hdr)
-        case fill_buffer(pid, rest, len) do
-          data when is_binary(data) ->
-            <<_::bytes-size(len), rest::binary>> = data
-            parse_file(pid, offset + len, [hdr | acc], rest)
-          :eof ->
-            acc
-        end
-      data ->
-        offset = offset + byte_size(buf) - byte_size(data)
-        parse_file(pid, offset, acc, data)
+        :ok = AudioTag.FileReader.skip(reader, len)
+        hdr
+      :eof -> 
+        nil
     end
   end
-  
+
   defp parse_frame(<<_::11, 
                   version_id::2, 
                   layer::2, 
@@ -139,32 +122,6 @@ defmodule AudioTag.MP3 do
       original: original,
       emphasis: emphasis
     }
-                  end
-
-
-
-  defp fill_buffer(_fpid, buf, bytes_wanted) when byte_size(buf) >= bytes_wanted do
-    buf
-  end
-  defp fill_buffer(fpid, buf, bytes_wanted) do
-    n = bytes_wanted - byte_size(buf)
-    case IO.binread(fpid, Enum.max([n, @chunk_size])) do
-      data when is_binary(data) and byte_size(data) < n ->
-        :eof
-      data when is_binary(data) ->
-        buf <> data
-      :eof ->
-        :eof
-    end
   end
 
-  defp find_header(data) when byte_size(data) < 2, do: data
-  defp find_header(data) do
-    case data do
-      <<255, 7::3, vzn::2, layer::2, _::bitstring>> when vzn != 1 and layer != 0 ->
-        data
-      <<_::8, rest::bitstring>> ->
-        find_header(rest)
-    end
-  end
 end

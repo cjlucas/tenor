@@ -4,7 +4,7 @@ defmodule Foo do
 
   def run(fpath) do
     profile do
-      AudioTag.MP3.parse(fpath)
+      AudioTag.Parser.parse!(fpath)
     end
   end
 end
