@@ -1,6 +1,8 @@
 defmodule AudioTag.ID3v2 do
   @type id3_frame :: {frame_id :: binary, size :: integer, flags :: number, data :: binary}
 
+  defstruct frames: []
+
   def syncsafe(n) do
     use Bitwise
 
@@ -32,15 +34,17 @@ defmodule AudioTag.ID3v2 do
         size = syncsafe(size)
         case AudioTag.FileReader.read(reader, size) do
           {:ok, data} ->
-            read_frames(data, config)
+            frames =
+              read_frames(data, config)
+              |> Enum.map(&AudioTag.ID3v2.Frame.parse_frame/1)
+
+            %__MODULE__{frames: frames}
           :eof ->
-            :eof
+            %__MODULE__{}
         end
       :eof ->
-        nil
+        %__MODULE__{}
     end
-
-
   end
 
   def read_frames(buf, config) do

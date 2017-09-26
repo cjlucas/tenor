@@ -4,6 +4,7 @@ defmodule MusicApp.Track do
   schema "tracks" do
     field :name, :string
     field :position, :integer
+    field :duration, :float
     field :total_tracks, :integer
     field :release_date, :naive_datetime
 
@@ -19,6 +20,16 @@ defmodule MusicApp.Track do
 
   def changeset(track, params \\ %{}) do
     track
-    |> cast(params, [:name, :position, :total_tracks, :release_date, :file_id, :album_artist_id, :artist_id, :album_id, :disc_id, :image_id])
+    |> cast(params, [:name,
+                     :position, 
+                     :duration, 
+                     :total_tracks, 
+                     :release_date, 
+                     :file_id, 
+                     :album_artist_id, 
+                     :artist_id, 
+                     :album_id, 
+                     :disc_id, 
+                     :image_id])
   end
 end
