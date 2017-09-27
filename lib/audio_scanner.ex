@@ -15,12 +15,13 @@ defmodule AudioScanner do
     |> Path.wildcard
     |> Enum.filter(&needs_scan?/1)
     |> Enum.each(fn fname ->
+      IO.puts inspect fname
+
       track =
         fname
         |> AudioTag.Parser.parse!
         |> track_from_frames
 
-      IO.puts inspect track
 
       %{inode: inode, mtime: mtime, size: size} = File.stat! fname
       file_id = 
@@ -92,19 +93,13 @@ defmodule AudioScanner do
           name: track.disc_name,
         })
 
-      params =
-        Map.take(track, [:name, 
-                         :position, 
-                         :duration, 
-                         :total_tracks,
-                         :release_date])
-        |> Map.merge(%{
-          file_id: file_id,
-          artist_id: artist.id,
-          album_artist_id: album_artist.id,
-          album_id: album.id,
-          disc_id: disc.id,
-          image_id: image_id,
+      params = Map.merge(track, %{
+                           file_id: file_id,
+                           artist_id: artist.id,
+                           album_artist_id: album_artist.id,
+                           album_id: album.id,
+                           disc_id: disc.id,
+                           image_id: image_id,
         })
 
       fun = if track_id == nil do
