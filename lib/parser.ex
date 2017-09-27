@@ -23,6 +23,10 @@ defmodule AudioTag.FileReader do
     GenServer.call(pid, {:skip, n})
   end
 
+  def offset(pid) do
+    GenServer.call(pid, :offset)
+  end
+
   def close(pid) do
     GenServer.stop(pid)
   end
@@ -80,6 +84,12 @@ defmodule AudioTag.FileReader do
       :eof ->
         {:reply, :eof, state}
     end
+  end
+
+  def handle_call(:offset, _from, state) do
+    %{offset: offset} = state
+
+    {:reply, offset, state}
   end
 
   defp fill_buffer(%{buffer: buf} = r, n) when byte_size(buf) >= n, do: {:ok, r}
