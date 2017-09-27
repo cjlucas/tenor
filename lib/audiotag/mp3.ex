@@ -16,6 +16,7 @@ defmodule AudioTag.MP3 do
       :emphasis
     ]
 
+    # indexed by {version_id, layer}
     @bitrate_lut %{
       # V1, L1
       {3, 3} => [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
@@ -25,11 +26,15 @@ defmodule AudioTag.MP3 do
       {3, 1} => [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
       # V2, L1
       {2, 3} => [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256],
+      {0, 3} => [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256],
       # V2, L2 & L3
       {2, 2} => [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
+      {0, 2} => [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
       {2, 1} => [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
+      {0, 1} => [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
     }
 
+    # indexed by version_id
     @sample_rate_lut %{
       # MPEG1
       3 => [44100, 48000, 32000],
@@ -39,19 +44,47 @@ defmodule AudioTag.MP3 do
       0 => [11025, 12000, 8000]
     }
 
+    # NOTE: I couldn't find any information as to why MPEG2/2.5 both use
+    # a coefficient of 72 for L3, I had to pull it directly from mediainfolib:
+    #
+    # https://github.com/MediaArea/MediaInfoLib/blob/e31f086e163a7a0dea452e6ca2642e7e432f99dd/Source/MediaInfo/Audio/File_Mpega.cpp#L232
+    #
+    # indexed by {version_id, layer}
+    @coefficient_lut %{
+      # MPEG1
+      {3, 1} => 144,
+      {3, 2} => 144,
+      {3, 3} => 12,
+      # MPEG2
+      {2, 1} => 72,
+      {2, 2} => 144,
+      {2, 3} => 12,
+      # MPEG2.5
+      {0, 1} => 72,
+      {0, 2} => 144,
+      {0, 3} => 12,
+    }
+
     @doc """
     Calculate the length of the frame (excluding the header)
     """
-    def frame_length(%__MODULE__{layer: layer, bitrate_index: idx} = hdr) when layer in [1, 2] do
+    def frame_length(%__MODULE__{layer: layer, bitrate_index: idx} = hdr) do
       # -4 to exclude the header
       br = bitrate(hdr)
       sr = sample_rate(hdr)
       pad = padding(hdr)
+      coeff = coefficient(hdr)
+
+      #IO.puts "br = #{br} sr = #{sr} pad = #{pad}"
 
       # Frame sizes are truncated
-      (((144 * br * 1000) / sr) + pad) - 4 |> trunc
+      (((coeff * br * 1000) / sr) + pad) - 4 |> trunc
     end
 
+    def coefficient(%__MODULE__{version_id: id, layer: layer}) do
+      Map.fetch!(@coefficient_lut, {id, layer})
+    end
+    
     def bitrate(%__MODULE__{version_id: id, layer: layer, bitrate_index: idx}) do
       Map.fetch!(@bitrate_lut, {id, layer}) |> Enum.fetch!(idx)
     end

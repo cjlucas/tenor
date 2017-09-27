@@ -190,7 +190,8 @@ defmodule AudioScanner do
         frame = List.first(mp3_frames)
 
         sr = AudioTag.MP3.Header.sample_rate(frame)
-        duration = length(mp3_frames) / (sr / 1152)
+        coeff = AudioTag.MP3.Header.coefficient(frame)
+        duration = length(mp3_frames) / (sr / (coeff * 8))
 
         %{track | duration: duration}
     else
