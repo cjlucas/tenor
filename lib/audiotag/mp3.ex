@@ -110,7 +110,7 @@ defmodule AudioTag.MP3 do
   def matches?(reader) do
     case AudioTag.FileReader.peek(reader, 3) do
       {:ok, <<255, 7::3, vzn::2, layer::2, _::1, bitrate::4, sample::2, _::2>>}
-        when vzn != 1 and layer != 0 and bitrate != 15 and sample != 3 ->
+        when vzn != 1 and layer != 0 and bitrate != 0 and bitrate != 15 and sample != 3 ->
         true
       _ ->
         false
