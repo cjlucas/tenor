@@ -2,7 +2,11 @@ defmodule AudioTag.Parser do
   def parse!(fpath) do
     {:ok, reader} = AudioTag.FileReader.open(fpath)
 
-    parse_reader(reader, [])
+    data = parse_reader(reader, [])
+
+    AudioTag.FileReader.close(reader)
+
+    data
   end
 
   @parsers [AudioTag.MP3, AudioTag.ID3v2] 

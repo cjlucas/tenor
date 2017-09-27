@@ -92,6 +92,12 @@ defmodule AudioTag.FileReader do
     {:reply, offset, state}
   end
 
+  def terminate(_reason, state) do
+    IO.puts inspect "closing"
+    %{fp: fp} = state
+    File.close(fp)
+  end
+
   defp fill_buffer(%{buffer: buf} = r, n) when byte_size(buf) >= n, do: {:ok, r}
   defp fill_buffer(%{fp: fp, buffer: buf} = r, n) do
     n = n - byte_size(buf)
