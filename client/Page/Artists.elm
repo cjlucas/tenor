@@ -167,7 +167,7 @@ update msg model =
 viewAlbums model =
     let
         duration track =
-            track.duration |> truncate |> Utils.durationText
+            track.duration |> round |> Utils.durationText
 
         viewTrack choseTrackMsg track =
             div [ class "flex border-bottom pb2 pt1 mb1" ]

@@ -254,7 +254,7 @@ viewModal album =
         viewTrack track =
             let
                 duration =
-                    track.duration |> truncate |> Utils.durationText
+                    track.duration |> round |> Utils.durationText
             in
                 div [ class "flex border-bottom pb2 pt1 mb1", onClick (SelectedTrack track.id) ]
                     [ div [ class "flex-auto pointer" ]
