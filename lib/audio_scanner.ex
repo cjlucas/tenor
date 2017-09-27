@@ -137,6 +137,12 @@ defmodule AudioScanner do
       end)
       |> Enum.map(&Map.fetch!(&1, :frames))
       |> List.flatten
+      |> Enum.reject(fn 
+        %Text{text: text} ->		
+          text |> String.trim |> String.length == 0		
+        _ ->		
+          false		
+      end)
       |> Enum.reduce(track, fn frame, track ->
         case frame do
           %Text{frame_id: "TPE1", text: text} ->
