@@ -32,10 +32,14 @@ defmodule AudioTag.Parser do
         {:ok, reader} -> parse_reader(reader, acc)
         {:eof, reader} -> acc
       end
-    else
-      {reader, stuff} = parser.parse(reader)
-      #IO.puts inspect stuff
-      parse_reader(reader, [stuff | acc])
+      else
+        case parser.parse(reader) do
+          {:ok, stuff, reader} ->
+            #IO.puts inspect stuff
+            parse_reader(reader, [stuff | acc])
+          {:error, _, reader} ->
+            parse_reader(reader, acc)
+        end
     end
   end
 end

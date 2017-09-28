@@ -124,10 +124,10 @@ defmodule AudioTag.MPEG do
         hdr = parse_frame(data)
         len = Frame.frame_length(hdr)
         case AudioTag.FileReader.skip(reader, len) do
-          {:ok, reader} -> {reader, hdr}
-          {:eof, reader} -> {reader, nil}
+          {:ok, reader} -> {:ok, hdr, reader}
+          {:eof, reader} -> {:error, :eof, reader}
         end
-        {:eof, reader} ->  {reader, nil}
+        {:eof, reader} ->  {:error, :eof, reader}
     end
   end
 

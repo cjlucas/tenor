@@ -41,12 +41,12 @@ defmodule AudioTag.ID3v2 do
               read_frames(data, config)
               |> Enum.map(&AudioTag.ID3v2.Frame.parse_frame/1)
 
-            {reader, %__MODULE__{frames: frames}}
+            {:ok, %__MODULE__{frames: frames}, reader}
           {:eof, reader} ->
-           {reader,  %__MODULE__{}}
+           {:error, :eof, reader}
         end
       :eof ->
-        {reader, %__MODULE__{}}
+        {:error, :eof, reader}
     end
   end
 
