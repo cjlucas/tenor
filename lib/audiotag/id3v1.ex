@@ -9,6 +9,8 @@ defmodule AudioTag.ID3v1 do
     case AudioTag.FileReader.peek(reader, 3) do
       {:ok, <<"TAG">>, reader} ->
         {true, reader}
+      {:ok, _, reader} ->
+        {false, reader}
       {:eof, reader} ->
         {false, reader}
     end
