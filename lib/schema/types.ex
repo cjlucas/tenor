@@ -92,6 +92,7 @@ defmodule MusicApp.Schema.Types do
 
     field :name, :string
     field :position, :integer
+    field :duration, :float
     field :release_date, :naive_datetime
 
     field :album_id, :id

@@ -46,7 +46,9 @@ defmodule MusicApp.Mixfile do
       {:absinthe, "~> 1.3"},
       {:absinthe_ecto, "~> 0.1.2"},
       {:absinthe_plug, "~> 1.3"},
-     {:cors_plug, "~> 1.2"},
+      {:cors_plug, "~> 1.2"},
+      {:exprof, "~> 0.2.0"},
+      {:gen_stage, "~> 0.12.2"}
     ]
   end
 

@@ -147,6 +147,7 @@ primeTracks player =
 type alias Track =
     { id : String
     , position : Int
+    , duration : Float
     , name : String
     , imageId : Maybe String
     }

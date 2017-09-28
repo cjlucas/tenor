@@ -1,5 +1,9 @@
 defmodule AudioTag.ID3v2 do
   @type id3_frame :: {frame_id :: binary, size :: integer, flags :: number, data :: binary}
+  
+  @behaviour AudioTag.FrameParser
+
+  defstruct frames: []
 
   def syncsafe(n) do
     use Bitwise
@@ -10,20 +14,40 @@ defmodule AudioTag.ID3v2 do
             (n &&& 0x7F)
   end
 
-  def read(data) do
-    parse_header(data)
+  def matches?(reader) do
+    case AudioTag.FileReader.peek(reader, 4) do
+      {:ok, <<"ID3", vzn::8>>, reader} when vzn in [3, 4] -> {true, reader}
+      {:ok, _, reader} -> {false, reader}
+      {:eof, reader} -> {false, reader}
+    end
   end
 
-  def parse_header(<<"ID3", version, 0, flags::8, size::32, rest::binary>>) do
-    config = if version == 4 do
-      %{frame_size_fun: &syncsafe/1}
-    else
-      %{frame_size_fun: fn i -> i end}
-    end
+  def parse(reader) do
+    case AudioTag.FileReader.read(reader, 10) do
+      {:ok, hdr, reader} ->
+        <<"ID3", version, 0, flags::8, size::32>> = hdr
 
-    size = syncsafe(size)
-    <<frame_data::bytes-size(size), _::binary>> = rest
-    read_frames(frame_data, config)
+        config = 
+          if version == 4 do
+            %{frame_size_fun: &syncsafe/1}
+          else
+            %{frame_size_fun: fn i -> i end}
+          end
+    
+        size = syncsafe(size)
+        case AudioTag.FileReader.read(reader, size) do
+          {:ok, data, reader} ->
+            frames =
+              read_frames(data, config)
+              |> Enum.map(&AudioTag.ID3v2.Frame.parse_frame/1)
+
+            {:ok, %__MODULE__{frames: frames}, reader}
+          {:eof, reader} ->
+           {:error, :eof, reader}
+        end
+      :eof ->
+        {:error, :eof, reader}
+    end
   end
 
   def read_frames(buf, config) do
