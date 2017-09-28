@@ -60,11 +60,9 @@ defmodule Consumer do
   end
 
   def handle_events(events, _from, state) do
-    IO.puts "Worker ##{state} got #{length(events)} events"
+    #IO.puts "Worker ##{state} got #{length(events)} events"
     events
     |> Enum.map(&AudioTag.Parser.parse!/1)
-    |> Enum.map(&length/1) 
-    |> Enum.each(&IO.puts/1)
 
     IO.puts DateTime.utc_now
 

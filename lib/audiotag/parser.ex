@@ -12,14 +12,29 @@ defmodule AudioTag.Parser do
   @parsers [AudioTag.MP3, AudioTag.ID3v2] 
 
   def parse_reader(reader, acc) do
-    parser = Enum.find(@parsers, &(&1.matches?(reader)))
+    out = Enum.reduce_while(@parsers, reader, fn parser, reader ->
+      case parser.matches?(reader) do
+        {true, reader} ->
+          {:halt, {parser, reader}}
+        {false, reader} ->
+          {:cont, reader}
+      end
+    end)
+
+    {parser, reader} = case out do
+      {parser, reader} -> {parser, reader}
+      reader -> {nil, reader}
+    end
+
     if is_nil(parser) do
+      #IO.puts "out of sync"
       case AudioTag.FileReader.skip(reader, 1) do
-        :ok -> parse_reader(reader, acc)
-        :eof -> acc
+        {:reply, :ok, reader} -> parse_reader(reader, acc)
+        {:reply, _, _} -> acc
       end
     else
-      stuff = parser.parse(reader)
+      {reader, stuff} = parser.parse(reader)
+      #IO.puts inspect stuff
       parse_reader(reader, [stuff | acc])
     end
   end

@@ -8,3 +8,5 @@ defmodule Foo do
     end
   end
 end
+
+System.argv |> List.first |> Foo.run

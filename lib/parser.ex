@@ -8,27 +8,33 @@ defmodule AudioTag.FileReader do
   @chunk_size 128_000
 
   def open(fpath) do
-    GenServer.start_link(__MODULE__, fpath)
+    init(fpath)
+    #GenServer.start_link(__MODULE__, fpath)
   end
 
   def peek(pid, n)do
-    GenServer.call(pid, {:peek, n})
+    handle_call({:peek, n}, nil, pid)
+    #GenServer.call(pid, {:peek, n})
   end
 
   def read(pid, n) do
-    GenServer.call(pid, {:read, n})
+    handle_call({:read, n}, nil, pid)
+    #GenServer.call(pid, {:read, n})
   end
 
   def skip(pid, n) do
-    GenServer.call(pid, {:skip, n})
+    handle_call({:skip, n}, nil, pid)
+    #GenServer.call(pid, {:skip, n})
   end
 
   def offset(pid) do
-    GenServer.call(pid, :offset)
+    handle_call(:offset, nil, pid)
+    #GenServer.call(pid, :offset)
   end
 
   def close(pid) do
-    GenServer.stop(pid)
+    terminate(nil, pid)
+    #GenServer.stop(pid)
   end
 
   def init(fpath) do
@@ -93,7 +99,6 @@ defmodule AudioTag.FileReader do
   end
 
   def terminate(_reason, state) do
-    IO.puts inspect "closing"
     %{fp: fp} = state
     File.close(fp)
   end
