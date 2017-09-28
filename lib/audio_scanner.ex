@@ -187,7 +187,7 @@ defmodule AudioScanner do
     mp3_frames =
       frames
       |> Enum.filter(fn
-        %AudioTag.MP3.Header{} -> true
+        %AudioTag.MPEG.Frame{} -> true
         _ -> false
       end)
 
@@ -195,8 +195,8 @@ defmodule AudioScanner do
       if length(mp3_frames) > 0 do
         frame = List.first(mp3_frames)
 
-        sr = AudioTag.MP3.Header.sample_rate(frame)
-        coeff = AudioTag.MP3.Header.coefficient(frame)
+        sr = AudioTag.MPEG.Frame.sample_rate(frame)
+        coeff = AudioTag.MPEG.Frame.coefficient(frame)
         duration = length(mp3_frames) / (sr / (coeff * 8))
 
         %{track | duration: duration}

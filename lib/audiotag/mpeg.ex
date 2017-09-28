@@ -1,5 +1,5 @@
-defmodule AudioTag.MP3 do
-  defmodule Header do
+defmodule AudioTag.MPEG do
+  defmodule Frame do
     defstruct [
       :byte_offset,
       :version_id,
@@ -75,8 +75,6 @@ defmodule AudioTag.MP3 do
       pad = padding(hdr)
       coeff = coefficient(hdr)
 
-      #IO.puts "br = #{br} sr = #{sr} pad = #{pad}"
-
       # Frame sizes are truncated
       (((coeff * br * 1000) / sr) + pad) - 4 |> trunc
     end
@@ -103,8 +101,6 @@ defmodule AudioTag.MP3 do
     end
   end
 
-  @chunk_size 256_000
-
   @header_size_bytes 4
 
   def matches?(reader) do
@@ -123,9 +119,7 @@ defmodule AudioTag.MP3 do
     case AudioTag.FileReader.read(reader, 4) do
       {:ok, data, reader} ->
         hdr = parse_frame(data)
-        len = Header.frame_length(hdr)
-        #IO.puts inspect hdr
-        #IO.puts "len = #{len}"
+        len = Frame.frame_length(hdr)
         case AudioTag.FileReader.skip(reader, len) do
           {:ok, reader} -> {reader, hdr}
           {:eof, reader} -> {reader, nil}
@@ -147,7 +141,7 @@ defmodule AudioTag.MP3 do
                   copyright::1, 
                   original::1, 
                   emphasis::2>>) do
-    %Header{
+    %Frame{
       version_id: version_id,
       layer: layer,
       protected_bit: protected,

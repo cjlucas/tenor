@@ -9,7 +9,7 @@ defmodule AudioTag.Parser do
     data
   end
 
-  @parsers [AudioTag.MP3, AudioTag.ID3v2] 
+  @parsers [AudioTag.MPEG, AudioTag.ID3v2] 
 
   def parse_reader(reader, acc) do
     out = Enum.reduce_while(@parsers, reader, fn parser, reader ->
