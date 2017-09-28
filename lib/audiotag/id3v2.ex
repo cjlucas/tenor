@@ -1,5 +1,7 @@
 defmodule AudioTag.ID3v2 do
   @type id3_frame :: {frame_id :: binary, size :: integer, flags :: number, data :: binary}
+  
+  @behaviour AudioTag.FrameParser
 
   defstruct frames: []
 

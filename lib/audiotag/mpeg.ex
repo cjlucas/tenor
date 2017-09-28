@@ -1,4 +1,7 @@
 defmodule AudioTag.MPEG do
+
+  @behaviour AudioTag.FrameParser
+
   defmodule Frame do
     defstruct [
       :byte_offset,
