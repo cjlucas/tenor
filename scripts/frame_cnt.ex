@@ -30,7 +30,65 @@ fpath = "/Users/chris/Downloads/01 Jack Johnson - Subplots.mp3"
 #FrameCount.doit(data)
 
 
-System.argv 
-|> Enum.map(&AudioTag.Parser.parse!/1)
-|> Enum.map(&length/1) 
-|> Enum.each(&IO.puts/1)
+defmodule Producer do
+  use GenStage
+
+  def start_link(files) do
+    GenStage.start_link(__MODULE__, files)
+  end
+
+  def init(files) do
+    {:producer, files}
+  end
+
+  def handle_demand(demand, files) when demand > 0 do
+    {events, rest} = Enum.split(files, demand)
+
+    {:noreply, events, rest}
+  end
+end
+
+defmodule Consumer do
+  use GenStage
+
+  def start_link(n) do
+    GenStage.start_link(__MODULE__, n)
+  end
+
+  def init(n) do
+    {:consumer, n}
+  end
+
+  def handle_events(events, _from, state) do
+    IO.puts "Worker ##{state} got #{length(events)} events"
+    events
+    |> Enum.map(&AudioTag.Parser.parse!/1)
+    |> Enum.map(&length/1) 
+    |> Enum.each(&IO.puts/1)
+
+    IO.puts DateTime.utc_now
+
+    {:noreply, [], state}
+  end
+end
+
+#:observer.start
+
+IO.puts DateTime.utc_now
+files = 
+  System.argv 
+  |> Enum.map(&Path.join(&1, "**/*.mp3"))
+  |> Enum.map(&Path.wildcard/1)
+  |> List.flatten
+
+IO.puts "Scanning #{length(files)} files"
+
+{:ok, producer} = Producer.start_link(files)
+for i <- 1..8 do
+  IO.puts i
+
+  {:ok, consumer} = Consumer.start_link(i)
+  GenStage.sync_subscribe(consumer, to: producer, max_demand: 20)
+end
+
+Process.sleep(60_000_000)
