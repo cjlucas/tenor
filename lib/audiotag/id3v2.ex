@@ -14,15 +14,15 @@ defmodule AudioTag.ID3v2 do
 
   def matches?(reader) do
     case AudioTag.FileReader.peek(reader, 4) do
-      {:reply, {:ok, <<"ID3", vzn::8>>}, reader} when vzn in [3, 4] -> {true, reader}
-      {:reply, {:ok, _}, reader} -> {false, reader}
-      {:reply, :eof, reader} -> {false, reader}
+      {:ok, <<"ID3", vzn::8>>, reader} when vzn in [3, 4] -> {true, reader}
+      {:ok, _, reader} -> {false, reader}
+      {:eof, reader} -> {false, reader}
     end
   end
 
   def parse(reader) do
     case AudioTag.FileReader.read(reader, 10) do
-      {:reply, {:ok, hdr}, reader} ->
+      {:ok, hdr, reader} ->
         <<"ID3", version, 0, flags::8, size::32>> = hdr
 
         config = 
@@ -34,17 +34,17 @@ defmodule AudioTag.ID3v2 do
     
         size = syncsafe(size)
         case AudioTag.FileReader.read(reader, size) do
-          {:reply, {:ok, data}, reader} ->
+          {:ok, data, reader} ->
             frames =
               read_frames(data, config)
               |> Enum.map(&AudioTag.ID3v2.Frame.parse_frame/1)
 
             {reader, %__MODULE__{frames: frames}}
-          {:reply, :eof, reader} ->
-           {reader,  %__MODULE__{} }
+          {:eof, reader} ->
+           {reader,  %__MODULE__{}}
         end
       :eof ->
-        {reader, %__MODULE__{} }
+        {reader, %__MODULE__{}}
     end
   end
 

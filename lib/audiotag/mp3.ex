@@ -109,28 +109,28 @@ defmodule AudioTag.MP3 do
 
   def matches?(reader) do
     case AudioTag.FileReader.peek(reader, 3) do
-      {:reply, {:ok, <<255, 7::3, vzn::2, layer::2, _::1, bitrate::4, sample::2, _::2>>}, reader}
+      {:ok, <<255, 7::3, vzn::2, layer::2, _::1, bitrate::4, sample::2, _::2>>, reader}
         when vzn != 1 and layer != 0 and bitrate != 0 and bitrate != 15 and sample != 3 ->
           {true, reader}
-      {:reply, {:ok, _}, reader} ->
+      {:ok, _, reader} ->
         {false, reader}
-      {:reply, :eof, reader} ->
+      {:eof, reader} ->
         {false, reader}
     end
   end
 
   def parse(reader) do
     case AudioTag.FileReader.read(reader, 4) do
-      {:reply, {:ok, data}, reader} ->
+      {:ok, data, reader} ->
         hdr = parse_frame(data)
         len = Header.frame_length(hdr)
         #IO.puts inspect hdr
         #IO.puts "len = #{len}"
         case AudioTag.FileReader.skip(reader, len) do
-          {:reply, :ok, reader} -> {reader, hdr}
-          {:reply, :eof, reader} -> {reader, nil}
+          {:ok, reader} -> {reader, hdr}
+          {:eof, reader} -> {reader, nil}
         end
-        {:reply, :eof, reader} ->  {reader, nil}
+        {:eof, reader} ->  {reader, nil}
     end
   end
 

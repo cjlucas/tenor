@@ -1,6 +1,4 @@
 defmodule AudioTag.FileReader do
-  use GenServer
-
   defmodule State do
     defstruct fp: nil, buffer: <<>>, offset: 0
   end
@@ -8,36 +6,6 @@ defmodule AudioTag.FileReader do
   @chunk_size 128_000
 
   def open(fpath) do
-    init(fpath)
-    #GenServer.start_link(__MODULE__, fpath)
-  end
-
-  def peek(pid, n)do
-    handle_call({:peek, n}, nil, pid)
-    #GenServer.call(pid, {:peek, n})
-  end
-
-  def read(pid, n) do
-    handle_call({:read, n}, nil, pid)
-    #GenServer.call(pid, {:read, n})
-  end
-
-  def skip(pid, n) do
-    handle_call({:skip, n}, nil, pid)
-    #GenServer.call(pid, {:skip, n})
-  end
-
-  def offset(pid) do
-    handle_call(:offset, nil, pid)
-    #GenServer.call(pid, :offset)
-  end
-
-  def close(pid) do
-    terminate(nil, pid)
-    #GenServer.stop(pid)
-  end
-
-  def init(fpath) do
     case File.open(fpath, [:binary]) do
       {:ok, pid} ->
         {:ok, %State{fp: pid}}
@@ -46,59 +14,56 @@ defmodule AudioTag.FileReader do
     end
   end
 
-  def handle_call({:peek, n}, _from, %{buffer: buf} = state) when byte_size(buf) >= n do
+  def peek(%{buffer: buf} = state, n) when byte_size(buf) >= n do
     {part, _} = split_buffer(buf, n)
-    {:reply, {:ok, part}, state}
+    {:ok, part, state}
   end
 
-  def handle_call({:peek, n}, from, state) do
+  def peek(state, n) do
     case fill_buffer(state, n) do
       {:ok, state} ->
-        handle_call({:peek, n}, from, state)
+        peek(state, n)
       :eof ->
-        {:reply, :eof, state}
+        {:eof, state}
     end
   end
 
-  def handle_call({:read, n}, _from, %{buffer: buf} = state) when byte_size(buf) >= n do
+  def read(%{buffer: buf} = state, n) when byte_size(buf) >= n do
     %{buffer: buf, offset: offset} = state
 
     {part, rest} = split_buffer(buf, n)
-    {:reply, {:ok, part}, %{state | buffer: rest, offset: offset + n}}
+
+    state = %{state | buffer: rest, offset: offset + n}
+    {:ok, part, state}
   end
 
-  def handle_call({:read, n}, from, state) do
+  def read(state, n) do
     case fill_buffer(state, n) do
       {:ok, state} ->
-        handle_call({:read, n}, from, state)
+        read(state, n)
       :eof ->
-        {:reply, :eof, state}
+        {:eof, state}
     end
   end
 
-  def handle_call({:skip, n}, _from, %{buffer: buf} = state) when byte_size(buf) >= n do
+  def skip(%{buffer: buf} = state, n) when byte_size(buf) >= n do
     %{buffer: buf, offset: offset} = state
 
     {_, rest} = split_buffer(buf, n)
-    {:reply, :ok, %{state | buffer: rest, offset: offset + n}}
+
+    {:ok, %{state | buffer: rest, offset: offset + n}}
   end
 
-  def handle_call({:skip, n}, from, state) do
+  def skip(state, n) do
     case fill_buffer(state, n) do
       {:ok, state} ->
-        handle_call({:skip, n}, from, state)
+        skip(state, n)
       :eof ->
-        {:reply, :eof, state}
+        {:eof, state}
     end
   end
 
-  def handle_call(:offset, _from, state) do
-    %{offset: offset} = state
-
-    {:reply, offset, state}
-  end
-
-  def terminate(_reason, state) do
+  def close(state) do
     %{fp: fp} = state
     File.close(fp)
   end

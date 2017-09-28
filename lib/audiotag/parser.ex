@@ -29,8 +29,8 @@ defmodule AudioTag.Parser do
     if is_nil(parser) do
       #IO.puts "out of sync"
       case AudioTag.FileReader.skip(reader, 1) do
-        {:reply, :ok, reader} -> parse_reader(reader, acc)
-        {:reply, _, _} -> acc
+        {:ok, reader} -> parse_reader(reader, acc)
+        {:eof, reader} -> acc
       end
     else
       {reader, stuff} = parser.parse(reader)
