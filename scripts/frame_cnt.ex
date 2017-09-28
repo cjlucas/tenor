@@ -72,7 +72,7 @@ defmodule Consumer do
   end
 end
 
-#:observer.start
+:observer.start
 
 IO.puts DateTime.utc_now
 files = 
@@ -88,7 +88,7 @@ for i <- 1..8 do
   IO.puts i
 
   {:ok, consumer} = Consumer.start_link(i)
-  GenStage.sync_subscribe(consumer, to: producer, max_demand: 20)
+  GenStage.sync_subscribe(consumer, to: producer, max_demand: 50)
 end
 
 Process.sleep(60_000_000)
