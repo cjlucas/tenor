@@ -1,6 +1,8 @@
 package db
 
 import (
+	"fmt"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
@@ -9,8 +11,9 @@ type Error struct {
 	Errors []error
 }
 
-func (e Error) Error() string {
-	return "ERRORS HAPPENED"
+func (e *Error) Error() string {
+	fmt.Println("DUDE HEREugh", e == nil)
+	return fmt.Sprintf("%s", e.Errors)
 }
 
 type DB struct {
@@ -52,6 +55,7 @@ func (db *DB) model(i interface{}) *DB {
 
 func (db *DB) wrapErrors(gdb *gorm.DB) *Error {
 	errors := gdb.GetErrors()
+	fmt.Println("GET ERRORS", errors)
 	if len(errors) == 0 {
 		return nil
 	}
@@ -71,9 +75,24 @@ func (c *collection) FirstOrCreate(query interface{}, val interface{}) error {
 	return c.db.wrapErrors(c.db.db.FirstOrCreate(val, query))
 }
 
+func (c *collection) All(out interface{}) error {
+	return c.db.wrapErrors(c.db.db.Find(out))
+}
+
+func (c *collection) Where(query interface{}) *collection {
+	return &collection{
+		&DB{
+			db: c.db.db.Where(query),
+		},
+	}
+}
+
 func (c *collection) Limit(count int) *collection {
-	c.db.db = c.db.db.Limit(count)
-	return c
+	return &collection{
+		&DB{
+			db: c.db.db.Limit(count),
+		},
+	}
 }
 
 type TrackCollection struct {

@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/cjlucas/tenor/db"
 	"github.com/graphql-go/graphql"
-	"github.com/nicksrandall/dataloader"
 )
 
 type ListObject struct {
@@ -30,86 +30,99 @@ type Object struct {
 	Fields []*Field
 }
 
+// Convert string from go-style field names to GraphQL style field names
+//
+// ID -> id
+// ArtistID -> artistId
+// FooBarBaz -> fooBarBaz
+func fieldName(name string) string {
+	split := strings.Split(name, "")
+
+	leaveUppercase := false
+	for i, s := range split {
+		if s == strings.ToUpper(s) {
+			if leaveUppercase {
+				leaveUppercase = false
+			} else {
+				split[i] = strings.ToLower(s)
+			}
+		} else {
+			leaveUppercase = true
+		}
+	}
+
+	return strings.Join(split, "")
+}
+
 func NewObject(name string) *Object {
 	return &Object{
 		Name: name,
 	}
 }
 
+func NewObjectWithModel(name string, model interface{}) *Object {
+	obj := NewObject(name)
+
+	obj.addFieldsFromModel(reflect.TypeOf(model), nil)
+	return obj
+}
+
+func (o *Object) addFieldsFromModel(modelType reflect.Type, indexPath []int) {
+	fmt.Println("OMHEEE")
+
+	if modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
+	}
+
+	fmt.Println(modelType.Kind())
+
+	for i := 0; i < modelType.NumField(); i++ {
+		field := modelType.Field(i)
+		fmt.Println("HERE?", field.Name)
+		path := append([]int{}, indexPath...)
+		path = append(path, i)
+
+		if field.Anonymous {
+			o.addFieldsFromModel(field.Type, path)
+			continue
+		}
+
+		var output graphql.Output
+		switch reflect.New(field.Type).Elem().Interface().(type) {
+		case string:
+			output = graphql.String
+		case int, uint:
+			output = graphql.Int
+		case float32, float64:
+			output = graphql.Float
+		}
+
+		if output == nil {
+			continue
+		}
+
+		resolver := func(ctx context.Context, source interface{}) (interface{}, error) {
+			sourceValue := reflect.ValueOf(source)
+			for sourceValue.Kind() == reflect.Ptr {
+				sourceValue = sourceValue.Elem()
+			}
+
+			val := sourceValue.FieldByIndex(path).Interface()
+			return val, nil
+		}
+
+		fmt.Println("Adding field magically", field.Name)
+
+		o.AddField(&Field{
+			Name:     fieldName(field.Name),
+			Type:     output,
+			Resolver: resolver,
+		})
+	}
+}
+
 func (o *Object) AddField(field *Field) {
 	o.Fields = append(o.Fields, field)
-}
-
-// Example Resolver (no concrete type)
-type Resolver struct {
-	DB     *db.DB             // injected
-	Loader *dataloader.Loader // injected
-
-	Limit string `args:"limit,optional"`
-}
-
-func (r *Resolver) Resolve(ctx context.Context, artist *db.Artist) (interface{}, error) {
-	return r.Loader.Load(ctx, artist.ID)()
-}
-
-type IDResolver struct {
-}
-
-func (r *IDResolver) Resolve(ctx context.Context, source interface{}) (interface{}, error) {
-	track := source.(*db.Track)
-	return track.ID, nil
-}
-
-type ArtistTracksResolver struct {
-	DB *db.DB
-
-	Loader *dataloader.Loader
-}
-
-/*
- *func (r *ArtistTracksResolver) BatchFunc(ctx context.Context, keys []string) []*dataloader.Result {
- *    fmt.Println("WTFHERE")
- *    var tracks []db.Track
- *    gdb.Model(&db.Track{}).Where("artist_id in (?)", keys).Find(&tracks)
- *
- *    trackMap := make(map[string][]*db.Track)
- *
- *    for i := range tracks {
- *        track := &tracks[i]
- *        trackMap[track.ArtistID] = append(trackMap[track.ArtistID], track)
- *    }
- *
- *    var results []*dataloader.Result
- *    for _, key := range keys {
- *        results = append(results, &dataloader.Result{
- *            Data: trackMap[key],
- *        })
- *    }
- *
- *    return results
- *}
- */
-
-func (r *ArtistTracksResolver) Resolve(ctx context.Context, source *db.Artist) (interface{}, error) {
-	return r.Loader.Load(ctx, source.ID)()
-
-}
-
-type GetArtistsResolver struct {
-	DB *db.DB
-}
-
-func (r *GetArtistsResolver) Resolve(ctx context.Context) (interface{}, error) {
-	return nil, nil
-}
-
-type GetFive struct {
-	Limit int `args:"limit"`
-}
-
-func (r *GetFive) Resolve(ctx context.Context) (interface{}, error) {
-	fmt.Println("LIMIT IS", r.Limit)
-	return 5, nil
 }
 
 type Schema struct {
@@ -145,6 +158,7 @@ func (s *Schema) AddMutation(field *Field) {
 
 func (s *Schema) Build(db *db.DB) error {
 	buildCtx := &schemaBuildContext{
+		db:      db,
 		objects: make(map[string]*graphql.Object),
 	}
 
@@ -172,6 +186,10 @@ func (s *Schema) buildArgument(resolver interface{}) (graphql.FieldConfigArgumen
 	resolverType := reflect.TypeOf(resolver)
 	resolverValue := reflect.ValueOf(resolver)
 
+	if resolverType.Kind() == reflect.Func {
+		return nil, nil
+	}
+
 	args := make(graphql.FieldConfigArgument)
 	for i := 0; i < resolverValue.Elem().NumField(); i++ {
 		field := resolverType.Elem().Field(i)
@@ -198,43 +216,72 @@ func (s *Schema) buildResolver(buildCtx *schemaBuildContext, resolver interface{
 
 	methodValue := resolverValue.MethodByName("Resolve")
 	var noValue reflect.Value
-	if methodValue == noValue {
-		return nil, errors.New("Resolve method is undefined")
+	if methodValue == noValue && resolverValue.Kind() != reflect.Func {
+		return nil, errors.New("Resolver must be a function or a receiver with a method called Resolve")
 	}
 
 	resolveFn := func(p graphql.ResolveParams) (interface{}, error) {
-		res := reflect.New(resolverValue.Elem().Type())
+		var funcValue reflect.Value
 
-		for i := 0; i < res.Elem().NumField(); i++ {
-			if name, ok := res.Elem().Type().Field(i).Tag.Lookup("args"); ok {
-				val := reflect.ValueOf(p.Args[name])
-				res.Elem().Field(i).Set(val)
+		if resolverValue.MethodByName("Resolve") != noValue {
+			res := reflect.New(resolverValue.Elem().Type())
+
+			// Inject dependencies/arguments into struct
+			for i := 0; i < res.Elem().NumField(); i++ {
+				fieldVal := res.Elem().Field(i)
+
+				switch fieldVal.Interface().(type) {
+				case *db.DB:
+					fmt.Println("injecting DB")
+					fieldVal.Set(reflect.ValueOf(buildCtx.db))
+				}
+
+				if name, ok := res.Elem().Type().Field(i).Tag.Lookup("args"); ok {
+					val := reflect.ValueOf(p.Args[name])
+
+					if val.IsValid() {
+						res.Elem().Field(i).Set(val)
+					}
+				}
 			}
-		}
 
-		method := res.MethodByName("Resolve")
+			funcValue = res.MethodByName("Resolve")
+		} else if resolverValue.Kind() == reflect.Func {
+			funcValue = resolverValue
+		} else {
+			return nil, errors.New("Could not determine resolver function")
+		}
 
 		// The resolver only takes a ctx as an arg
-		if method.Type().NumIn() == 1 {
-			retValues := method.Call([]reflect.Value{
+		var args []reflect.Value
+		switch funcValue.Type().NumIn() {
+		case 1: // only ctx.
+			args = []reflect.Value{reflect.ValueOf(p.Context)}
+		case 2: // ctx + source
+			args = []reflect.Value{
 				reflect.ValueOf(p.Context),
-			})
-
-			var err error
-			if !retValues[1].IsNil() {
-				err = retValues[1].Interface().(error)
+				reflect.ValueOf(p.Source),
 			}
-
-			return retValues[0].Interface(), err
 		}
 
-		return nil, nil
+		retValues := funcValue.Call(args)
+		var err error
+		if retValues[1].Elem().IsValid() && !retValues[1].Elem().IsNil() {
+			err = retValues[1].Interface().(error)
+		}
+
+		return retValues[0].Interface(), err
 	}
 
 	return resolveFn, nil
 }
 
 func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*graphql.Object, error) {
+	// Fast path if object has already been built
+	if obj, ok := buildCtx.objects[object.Name]; ok {
+		return obj, nil
+	}
+
 	var config graphql.ObjectConfig
 	fields := make(graphql.Fields)
 	config.Fields = fields
@@ -242,7 +289,6 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 	config.Name = object.Name
 
 	out := graphql.NewObject(config)
-	out.AddFieldConfig("balls", &graphql.Field{Type: graphql.ID})
 	buildCtx.objects[object.Name] = out
 
 	for _, field := range object.Fields {
@@ -251,29 +297,17 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 		case graphql.Output:
 			output = t
 		case *Object:
-			obj, ok := buildCtx.objects[t.Name]
-			if !ok {
-				obj, err := s.buildObject(buildCtx, t)
-				output = obj
-				if err != nil {
-					return nil, err
-				}
-				buildCtx.objects[t.Name] = obj
-			} else {
-				output = obj
+			obj, err := s.buildObject(buildCtx, t)
+			if err != nil {
+				return nil, err
 			}
+			output = obj
 		case ListObject:
-			obj, ok := buildCtx.objects[t.Of.Name]
-			if !ok {
-				obj, err := s.buildObject(buildCtx, t.Of)
-				output = obj
-				if err != nil {
-					return nil, err
-				}
-				buildCtx.objects[t.Of.Name] = obj
-			} else {
-				output = graphql.NewList(obj)
+			obj, err := s.buildObject(buildCtx, t.Of)
+			if err != nil {
+				return nil, err
 			}
+			output = graphql.NewList(obj)
 		default:
 			return nil, errors.New("unknown Type")
 		}
@@ -302,20 +336,14 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 	return out, nil
 }
 
-func LoadSchema() (*Schema, error) {
-	trackObject := NewObject("Track")
-	trackObject.AddField(&Field{
-		Name:     "ID",
-		Type:     graphql.ID,
-		Resolver: &IDResolver{},
-	})
+func LoadSchema(dal *db.DB) (*Schema, error) {
+	trackObject := NewObjectWithModel("Track", db.Track{})
 
-	artistObject := NewObject("Artist")
-
+	artistObject := NewObjectWithModel("Artist", db.Artist{})
 	artistObject.AddField(&Field{
 		Name:     "tracks",
 		Type:     ListObject{Of: trackObject},
-		Resolver: &ArtistTracksResolver{},
+		Resolver: &artistTracksResolver{},
 	})
 
 	/*
@@ -331,16 +359,10 @@ func LoadSchema() (*Schema, error) {
 	schema.AddQuery(&Field{
 		Name:     "artists",
 		Type:     ListObject{Of: artistObject},
-		Resolver: &GetArtistsResolver{},
+		Resolver: &getArtistsResolver{},
 	})
 
-	schema.AddQuery(&Field{
-		Name:     "five",
-		Type:     graphql.Int,
-		Resolver: &GetFive{},
-	})
-
-	return schema, schema.Build(nil)
+	return schema, schema.Build(dal)
 }
 
 func (s *Schema) HandleFunc(w http.ResponseWriter, r *http.Request) {

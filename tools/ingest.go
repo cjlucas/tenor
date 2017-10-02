@@ -33,13 +33,8 @@ func parseID3Position(str string) (int, int) {
 	return pos, total
 }
 
-func main() {
-	dal, err := db.Open("dev.db")
-	if err != nil {
-		panic(err)
-	}
-
-	err = filepath.Walk(os.Args[1], func(fpath string, finfo os.FileInfo, err error) error {
+func processDir(dal *db.DB, dirPath string) error {
+	return filepath.Walk(dirPath, func(fpath string, finfo os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -133,8 +128,17 @@ func main() {
 
 		return nil
 	})
+}
 
+func main() {
+	dal, err := db.Open("dev.db")
 	if err != nil {
 		panic(err)
+	}
+
+	for _, path := range os.Args[1:] {
+		if err := processDir(dal, path); err != nil {
+			panic(err)
+		}
 	}
 }

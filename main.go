@@ -17,7 +17,12 @@ import (
 )
 
 func main() {
-	schema, err := api.LoadSchema()
+	dal, err := db.Open("dev.db")
+	if err != nil {
+		panic(err)
+	}
+
+	schema, err := api.LoadSchema(dal)
 	if err != nil {
 		panic(err)
 	}
