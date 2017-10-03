@@ -134,6 +134,12 @@ func processDir(dal *db.DB, dirPath string) error {
 
 		dal.Discs.FirstOrCreate(&disc)
 
+		var duration float64
+		if len(parser.MPEGHeaders) > 0 {
+			hdr := parser.MPEGHeaders[0]
+			duration = float64(len(parser.MPEGHeaders)) / (float64(hdr.SamplingRate()) / float64(hdr.NumSamples()))
+		}
+
 		track := db.Track{
 			Title:       id3Map["TIT2"],
 			ArtistID:    artist.ID,
@@ -141,6 +147,7 @@ func processDir(dal *db.DB, dirPath string) error {
 			DiscID:      disc.ID,
 			Position:    info.TrackPosition,
 			TotalTracks: info.TotalTracks,
+			Duration:    duration,
 		}
 		dal.Tracks.Create(&track)
 

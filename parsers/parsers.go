@@ -61,7 +61,9 @@ func (p *MetadataParser) parseMPEGHeader(r *bufio.Reader) (bool, error) {
 		return false, nil
 	}
 
-	h := MPEGHeader{Raw: buf}
+	var hdrBuf [10]byte
+	copy(hdrBuf[:], buf)
+	h := MPEGHeader{Raw: hdrBuf[:]}
 	sz := h.frameSize()
 
 	if _, err := r.Discard(sz); err != nil {

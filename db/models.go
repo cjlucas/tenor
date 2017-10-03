@@ -40,6 +40,7 @@ type Track struct {
 	Title       string
 	Position    int
 	TotalTracks int
+	Duration    float64
 
 	Artist   Artist
 	ArtistID string `gorm:"index"`

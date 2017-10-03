@@ -63,6 +63,10 @@ func (h *MPEGHeader) SamplingRate() int {
 	return samplingRateLUT[h.version()][h.sampleIndex()]
 }
 
+func (h *MPEGHeader) NumSamples() int {
+	return coefficientLUT[h.version()][h.layer()] * 8
+}
+
 func (h *MPEGHeader) version() int {
 	return int((h.Raw[1] & 0x18) >> 3)
 }
