@@ -42,10 +42,10 @@ func Open(fpath string) (*DB, error) {
 }
 
 func (db *DB) init() {
-	db.Tracks = &TrackCollection{collection{db.model(&Track{})}}
-	db.Artists = &ArtistCollection{collection{db.model(&Artist{})}}
-	db.Albums = &AlbumCollection{collection{db.model(&Album{})}}
-	db.Discs = &DiscCollection{collection{db.model(&Disc{})}}
+	db.Tracks = &TrackCollection{Collection{db.model(&Track{})}}
+	db.Artists = &ArtistCollection{Collection{db.model(&Artist{})}}
+	db.Albums = &AlbumCollection{Collection{db.model(&Album{})}}
+	db.Discs = &DiscCollection{Collection{db.model(&Disc{})}}
 }
 
 func (db *DB) model(i interface{}) *DB {
@@ -63,32 +63,40 @@ func (db *DB) wrapErrors(gdb *gorm.DB) *Error {
 	return &Error{Errors: errors}
 }
 
-type collection struct {
+type Collection struct {
 	db *DB
 }
 
-func (c *collection) Create(val interface{}) error {
+func (c *Collection) Create(val interface{}) error {
 	return c.db.wrapErrors(c.db.db.Create(val))
 }
 
-func (c *collection) FirstOrCreate(query interface{}, val interface{}) error {
+func (c *Collection) FirstOrCreate(query interface{}, val interface{}) error {
 	return c.db.wrapErrors(c.db.db.FirstOrCreate(val, query))
 }
 
-func (c *collection) All(out interface{}) error {
+func (c *Collection) All(out interface{}) error {
 	return c.db.wrapErrors(c.db.db.Find(out))
 }
 
-func (c *collection) Where(query interface{}, vals ...interface{}) *collection {
-	return &collection{
+func (c *Collection) Where(query interface{}, vals ...interface{}) *Collection {
+	return &Collection{
 		&DB{
 			db: c.db.db.Where(query, vals...),
 		},
 	}
 }
 
-func (c *collection) Limit(count int) *collection {
-	return &collection{
+func (c *Collection) Order(field string, desc bool) *Collection {
+	return &Collection{
+		&DB{
+			db: c.db.db.Order(field, desc),
+		},
+	}
+}
+
+func (c *Collection) Limit(count int) *Collection {
+	return &Collection{
 		&DB{
 			db: c.db.db.Limit(count),
 		},
@@ -96,25 +104,25 @@ func (c *collection) Limit(count int) *collection {
 }
 
 type TrackCollection struct {
-	collection
+	Collection
 }
 
 func (c *TrackCollection) FirstOrCrrete(track *Track) error {
-	return c.collection.FirstOrCreate(track, track)
+	return c.Collection.FirstOrCreate(track, track)
 }
 
 type ArtistCollection struct {
-	collection
+	Collection
 }
 
 func (c *ArtistCollection) FirstOrCreate(artist *Artist) error {
 	query := map[string]interface{}{"name": artist.Name}
 
-	return c.collection.FirstOrCreate(query, artist)
+	return c.Collection.FirstOrCreate(query, artist)
 }
 
 type AlbumCollection struct {
-	collection
+	Collection
 }
 
 func (c *AlbumCollection) FirstOrCreate(album *Album) error {
@@ -123,11 +131,11 @@ func (c *AlbumCollection) FirstOrCreate(album *Album) error {
 		"artist_id": album.ArtistID,
 	}
 
-	return c.collection.FirstOrCreate(query, album)
+	return c.Collection.FirstOrCreate(query, album)
 }
 
 type DiscCollection struct {
-	collection
+	Collection
 }
 
 func (c *DiscCollection) FirstOrCreate(disc *Disc) error {
@@ -136,5 +144,5 @@ func (c *DiscCollection) FirstOrCreate(disc *Disc) error {
 		"album_id": disc.AlbumID,
 	}
 
-	return c.collection.FirstOrCreate(query, disc)
+	return c.Collection.FirstOrCreate(query, disc)
 }
