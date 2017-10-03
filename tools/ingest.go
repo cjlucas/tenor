@@ -65,6 +65,7 @@ func processDir(dal *db.DB, dirPath string) error {
 			ArtistName      string
 			AlbumArtistName string
 			AlbumTitle      string
+			DiscTitle       string
 			DiscPosition    int
 			TotalDiscs      int
 			TrackPosition   int
@@ -117,10 +118,27 @@ func processDir(dal *db.DB, dirPath string) error {
 			dal.Albums.FirstOrCreate(&album)
 		}
 
+		if s := id3Map["TPOS"]; s != "" {
+			pos, total := parseID3Position(s)
+			info.DiscPosition = pos
+			info.TotalDiscs = total
+		} else {
+			info.DiscPosition = 1
+		}
+
+		disc := db.Disc{
+			Title:    info.DiscTitle,
+			Position: info.DiscPosition,
+			AlbumID:  album.ID,
+		}
+
+		dal.Discs.FirstOrCreate(&disc)
+
 		track := db.Track{
 			Title:       id3Map["TIT2"],
 			ArtistID:    artist.ID,
 			AlbumID:     album.ID,
+			DiscID:      disc.ID,
 			Position:    info.TrackPosition,
 			TotalTracks: info.TotalTracks,
 		}
