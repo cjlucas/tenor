@@ -27,7 +27,6 @@ type getArtistsResolver struct {
 }
 
 func (r *getArtistsResolver) Resolve(ctx context.Context) (interface{}, error) {
-	fmt.Println("IN GET ARTIST RESOLVER", r.DB)
 	var artists []*db.Artist
 	err := r.DB.Artists.All(&artists)
 	return artists, err

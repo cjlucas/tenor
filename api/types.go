@@ -72,17 +72,12 @@ func NewObjectWithModel(name string, model interface{}) *Object {
 }
 
 func (o *Object) addFieldsFromModel(modelType reflect.Type, indexPath []int) {
-	fmt.Println("OMHEEE")
-
 	if modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
 	}
 
-	fmt.Println(modelType.Kind())
-
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
-		fmt.Println("HERE?", field.Name)
 		path := append([]int{}, indexPath...)
 		path = append(path, i)
 
@@ -114,8 +109,6 @@ func (o *Object) addFieldsFromModel(modelType reflect.Type, indexPath []int) {
 			val := sourceValue.FieldByIndex(path).Interface()
 			return val, nil
 		}
-
-		fmt.Println("Adding field magically", field.Name)
 
 		o.AddField(&Field{
 			Name:     fieldName(field.Name),
@@ -170,8 +163,6 @@ func (s *Schema) Build(db *db.DB) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("%#v\n", query)
 
 	schema, err := graphql.NewSchema(graphql.SchemaConfig{
 		Query: query,
@@ -256,7 +247,6 @@ func (s *Schema) buildResolver(buildCtx *schemaBuildContext, resolver interface{
 
 				switch fieldVal.Interface().(type) {
 				case *db.DB:
-					fmt.Println("injecting DB")
 					fieldVal.Set(reflect.ValueOf(buildCtx.db))
 				}
 
