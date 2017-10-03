@@ -12,10 +12,13 @@ import (
 
 	"github.com/cjlucas/tenor/db"
 	"github.com/graphql-go/graphql"
-	"github.com/nicksrandall/dataloader"
 )
 
 type ListObject struct {
+	Of *Object
+}
+
+type ConnectionObject struct {
 	Of *Object
 }
 
@@ -329,6 +332,53 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 				return nil, err
 			}
 			output = graphql.NewList(obj)
+		case ConnectionObject:
+			connObj := NewObject(t.Of.Name + "Connection")
+
+			edgeObj := NewObject(t.Of.Name + "Edge")
+			edgeObj.AddField(&Field{
+				Name: "cursor",
+				Type: graphql.String,
+				Resolver: func(ctx context.Context, edge Edge) (interface{}, error) {
+					return edge.Cursor, nil
+				},
+			})
+
+			edgeObj.AddField(&Field{
+				Name: strings.ToLower(t.Of.Name),
+				Type: t.Of,
+				Resolver: func(ctx context.Context, edge Edge) (interface{}, error) {
+					return edge.Node, nil
+				},
+			})
+
+			obj, err := s.buildObject(buildCtx, edgeObj)
+			if err != nil {
+				return nil, err
+			}
+
+			connObj.AddField(&Field{
+				Name: "endCursor",
+				Type: graphql.String,
+				Resolver: func(ctx context.Context, connection Connection) (interface{}, error) {
+					return connection.EndCursor, nil
+				},
+			})
+
+			connObj.AddField(&Field{
+				Name: "edges",
+				Type: graphql.NewList(obj),
+				Resolver: func(ctx context.Context, connection Connection) (interface{}, error) {
+					return connection.Edges, nil
+				},
+			})
+
+			connObject, err := s.buildObject(buildCtx, connObj)
+			if err != nil {
+				return nil, err
+			}
+
+			output = connObject
 		default:
 			return nil, errors.New("unknown Type")
 		}
@@ -360,48 +410,85 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 func LoadSchema(dal *db.DB) (*Schema, error) {
 	trackObject := NewObjectWithModel("Track", db.Track{})
 
-	artistObject := NewObjectWithModel("Artist", db.Artist{})
+	discObject := NewObjectWithModel("Disc", db.Disc{})
 
-	cache := dataloader.NoCache{}
-	artistObject.AddField(&Field{
+	discObject.AddField(&Field{
 		Name: "tracks",
 		Type: ListObject{Of: trackObject},
-		Resolver: &artistTracksResolver{
-			Loader: dataloader.NewBatchedLoader(func(ctx context.Context, keys []string) []*dataloader.Result {
-				var tracks []*db.Track
-				dal.Tracks.Where("artist_id in (?)", keys).All(&tracks)
-
-				m := make(map[string][]*db.Track)
-				for _, t := range tracks {
-					m[t.ArtistID] = append(m[t.ArtistID], t)
-				}
-
-				var results []*dataloader.Result
-				for _, key := range keys {
-					results = append(results, &dataloader.Result{
-						Data: m[key],
-					})
-				}
-
-				return results
-			}, dataloader.WithCache(&cache)),
+		Resolver: &hasManyAssocResolver{
+			Loader: NewHasManyAssocLoader(&dal.Tracks.Collection, &db.Track{}, "disc_id", "DiscID"),
 		},
 	})
 
-	/*
-	 *trackObject.AddField(&Field{
-	 *    Name: "artist",
-	 *    Type: artistObject,
-	 *    //Resolver: TODO
-	 *})
-	 */
+	albumObject := NewObjectWithModel("Album", db.Album{})
+
+	albumObject.AddField(&Field{
+		Name: "tracks",
+		Type: ListObject{Of: trackObject},
+		Resolver: &hasManyAssocResolver{
+			Loader: NewHasManyAssocLoader(&dal.Tracks.Collection, &db.Track{}, "album_id", "AlbumID"),
+		},
+	})
+
+	albumObject.AddField(&Field{
+		Name: "discs",
+		Type: ListObject{Of: discObject},
+		Resolver: &hasManyAssocResolver{
+			Loader: NewHasManyAssocLoader(&dal.Discs.Collection, &db.Disc{}, "album_id", "AlbumID"),
+		},
+	})
+
+	artistObject := NewObjectWithModel("Artist", db.Artist{})
+
+	artistObject.AddField(&Field{
+		Name: "tracks",
+		Type: ListObject{Of: trackObject},
+		Resolver: &hasManyAssocResolver{
+			Loader: NewHasManyAssocLoader(&dal.Tracks.Collection, &db.Track{}, "artist_id", "ArtistID"),
+		},
+	})
+
+	artistObject.AddField(&Field{
+		Name: "albums",
+		Type: ListObject{Of: albumObject},
+		Resolver: &hasManyAssocResolver{
+			Loader: NewHasManyAssocLoader(&dal.Albums.Collection, &db.Album{}, "artist_id", "ArtistID"),
+		},
+	})
+
+	trackObject.AddField(&Field{
+		Name: "album",
+		Type: albumObject,
+		Resolver: &belongsToAssocResolver{
+			FieldName: "AlbumID",
+			Loader:    NewBelongsToAssocLoader(&dal.Albums.Collection, &db.Album{}),
+		},
+	})
+
+	trackObject.AddField(&Field{
+		Name: "artist",
+		Type: artistObject,
+		Resolver: &belongsToAssocResolver{
+			FieldName: "ArtistID",
+			Loader:    NewBelongsToAssocLoader(&dal.Artists.Collection, &db.Artist{}),
+		},
+	})
+
+	trackObject.AddField(&Field{
+		Name: "disc",
+		Type: artistObject,
+		Resolver: &belongsToAssocResolver{
+			FieldName: "DiscID",
+			Loader:    NewBelongsToAssocLoader(&dal.Discs.Collection, &db.Disc{}),
+		},
+	})
 
 	schema := NewSchema()
 
 	schema.AddQuery(&Field{
 		Name:     "artists",
-		Type:     ListObject{Of: artistObject},
-		Resolver: &getArtistsResolver{},
+		Type:     ConnectionObject{Of: artistObject},
+		Resolver: &artistConnectionResolver{},
 	})
 
 	return schema, schema.Build(dal)
