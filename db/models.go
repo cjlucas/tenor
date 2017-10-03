@@ -6,7 +6,7 @@ import (
 )
 
 type Model struct {
-	ID string
+	ID string `gorm:"primary_key"`
 }
 
 func (m *Model) BeforeCreate(scope *gorm.Scope) error {
@@ -21,13 +21,13 @@ type Track struct {
 	TotalTracks int
 
 	Artist   Artist
-	ArtistID string
+	ArtistID string `gorm:"index"`
 
 	Album   Album
-	AlbumID string
+	AlbumID string `gorm:"index"`
 
 	Disc   Disc
-	DiscID string
+	DiscID string `gorm:"index"`
 }
 
 type Artist struct {
@@ -44,7 +44,7 @@ type Album struct {
 
 	Title string
 
-	ArtistID string
+	ArtistID string `gorm:"index"`
 
 	Discs  []Disc
 	Tracks []Track
@@ -53,10 +53,11 @@ type Album struct {
 type Disc struct {
 	Model
 
+	Title    string
 	Position int
 
 	Album   *Album
-	AlbumID string
+	AlbumID string `gorm:"index"`
 
 	Tracks []Track
 }
