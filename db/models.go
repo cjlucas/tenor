@@ -1,16 +1,37 @@
 package db
 
 import (
+	"time"
+
 	"github.com/jinzhu/gorm"
 	uuid "github.com/satori/go.uuid"
 )
 
 type Model struct {
 	ID string `gorm:"primary_key"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (m *Model) BeforeCreate(scope *gorm.Scope) error {
-	return scope.SetColumn("ID", uuid.NewV4().String())
+	if err := scope.SetColumn("ID", uuid.NewV4().String()); err != nil {
+		return err
+	}
+
+	if err := scope.SetColumn("CreatedAt", time.Now().UTC()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Model) BeforeUpdate(scope *gorm.Scope) error {
+	if err := scope.SetColumn("UpdatedAt", time.Now().UTC()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type Track struct {

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/cjlucas/tenor/db"
 	"github.com/graphql-go/graphql"
@@ -94,6 +95,8 @@ func (o *Object) addFieldsFromModel(modelType reflect.Type, indexPath []int) {
 			output = graphql.Int
 		case float32, float64:
 			output = graphql.Float
+		case time.Time:
+			output = dateTime
 		}
 
 		if output == nil {
