@@ -12,6 +12,7 @@ import (
 
 	"github.com/cjlucas/tenor/db"
 	"github.com/graphql-go/graphql"
+	"github.com/nicksrandall/dataloader"
 )
 
 type ListObject struct {
@@ -211,6 +212,26 @@ func (s *Schema) buildArgument(resolver interface{}) (graphql.FieldConfigArgumen
 	return args, nil
 }
 
+func cloneValue(val reflect.Value) reflect.Value {
+	for val.Kind() == reflect.Ptr {
+		val = reflect.Indirect(val)
+	}
+
+	if val.Kind() != reflect.Struct {
+		panic("cloneValue given a non-struct value")
+	}
+
+	out := reflect.New(val.Type())
+
+	for i := 0; i < val.NumField(); i++ {
+		if out.Elem().Field(i).CanSet() {
+			out.Elem().Field(i).Set(val.Field(i))
+		}
+	}
+
+	return out
+}
+
 func (s *Schema) buildResolver(buildCtx *schemaBuildContext, resolver interface{}) (graphql.FieldResolveFn, error) {
 	resolverValue := reflect.ValueOf(resolver)
 
@@ -224,7 +245,7 @@ func (s *Schema) buildResolver(buildCtx *schemaBuildContext, resolver interface{
 		var funcValue reflect.Value
 
 		if resolverValue.MethodByName("Resolve") != noValue {
-			res := reflect.New(resolverValue.Elem().Type())
+			res := cloneValue(resolverValue)
 
 			// Inject dependencies/arguments into struct
 			for i := 0; i < res.Elem().NumField(); i++ {
@@ -340,10 +361,31 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	trackObject := NewObjectWithModel("Track", db.Track{})
 
 	artistObject := NewObjectWithModel("Artist", db.Artist{})
+
+	cache := dataloader.NoCache{}
 	artistObject.AddField(&Field{
-		Name:     "tracks",
-		Type:     ListObject{Of: trackObject},
-		Resolver: &artistTracksResolver{},
+		Name: "tracks",
+		Type: ListObject{Of: trackObject},
+		Resolver: &artistTracksResolver{
+			Loader: dataloader.NewBatchedLoader(func(ctx context.Context, keys []string) []*dataloader.Result {
+				var tracks []*db.Track
+				dal.Tracks.Where("artist_id in (?)", keys).All(&tracks)
+
+				m := make(map[string][]*db.Track)
+				for _, t := range tracks {
+					m[t.ArtistID] = append(m[t.ArtistID], t)
+				}
+
+				var results []*dataloader.Result
+				for _, key := range keys {
+					results = append(results, &dataloader.Result{
+						Data: m[key],
+					})
+				}
+
+				return results
+			}, dataloader.WithCache(&cache)),
+		},
 	})
 
 	/*

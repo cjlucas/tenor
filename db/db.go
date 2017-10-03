@@ -79,10 +79,10 @@ func (c *collection) All(out interface{}) error {
 	return c.db.wrapErrors(c.db.db.Find(out))
 }
 
-func (c *collection) Where(query interface{}) *collection {
+func (c *collection) Where(query interface{}, vals ...interface{}) *collection {
 	return &collection{
 		&DB{
-			db: c.db.db.Where(query),
+			db: c.db.db.Where(query, vals...),
 		},
 	}
 }
