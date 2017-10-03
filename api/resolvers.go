@@ -22,16 +22,6 @@ type Edge struct {
 	Node   interface{}
 }
 
-type getArtistsResolver struct {
-	DB *db.DB
-}
-
-func (r *getArtistsResolver) Resolve(ctx context.Context) (interface{}, error) {
-	var artists []*db.Artist
-	err := r.DB.Artists.All(&artists)
-	return artists, err
-}
-
 type artistConnectionResolver struct {
 	DB *db.DB
 
@@ -40,7 +30,7 @@ type artistConnectionResolver struct {
 	OrderBy string `args:"orderBy"`
 }
 
-func (r *artistConnectionResolver) Resolve(ctx context.Context) (interface{}, error) {
+func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 	if r.First > 50 {
 		r.First = 50
 	}
@@ -85,7 +75,7 @@ func (r *artistConnectionResolver) Resolve(ctx context.Context) (interface{}, er
 		})
 	}
 
-	connection := Connection{
+	connection := &Connection{
 		EndCursor: edges[len(edges)-1].Cursor,
 		Edges:     edges,
 	}

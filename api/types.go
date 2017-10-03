@@ -323,8 +323,6 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 			}
 			output = graphql.NewList(obj)
 		case ConnectionObject:
-			connObj := NewObject(t.Of.Name + "Connection")
-
 			edgeObj := NewObject(t.Of.Name + "Edge")
 			edgeObj.AddField(&Field{
 				Name: "cursor",
@@ -347,10 +345,11 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 				return nil, err
 			}
 
+			connObj := NewObject(t.Of.Name + "Connection")
 			connObj.AddField(&Field{
 				Name: "endCursor",
 				Type: graphql.String,
-				Resolver: func(ctx context.Context, connection Connection) (interface{}, error) {
+				Resolver: func(ctx context.Context, connection *Connection) (string, error) {
 					return connection.EndCursor, nil
 				},
 			})
@@ -358,7 +357,7 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 			connObj.AddField(&Field{
 				Name: "edges",
 				Type: graphql.NewList(obj),
-				Resolver: func(ctx context.Context, connection Connection) (interface{}, error) {
+				Resolver: func(ctx context.Context, connection *Connection) ([]Edge, error) {
 					return connection.Edges, nil
 				},
 			})
