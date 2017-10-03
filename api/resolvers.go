@@ -122,3 +122,22 @@ func (r *belongsToAssocResolver) Resolve(ctx context.Context, source interface{}
 	}
 	return r.Loader.Load(ctx, field.Interface().(string))()
 }
+
+type idLookupResolver struct {
+	Collection *db.Collection
+	Type       interface{}
+
+	ID string `args:"id"`
+}
+
+func (r *idLookupResolver) Resolve(ctx context.Context) (interface{}, error) {
+	structType := reflect.ValueOf(r.Type)
+	for structType.Kind() == reflect.Ptr {
+		structType = reflect.Indirect(structType)
+	}
+
+	val := reflect.New(structType.Type()).Interface()
+	err := r.Collection.Where("id = ?", r.ID).One(val)
+
+	return val, err
+}

@@ -75,6 +75,10 @@ func (c *Collection) FirstOrCreate(query interface{}, val interface{}) error {
 	return c.db.wrapErrors(c.db.db.FirstOrCreate(val, query))
 }
 
+func (c *Collection) One(out interface{}) error {
+	return c.db.wrapErrors(c.db.db.Find(out))
+}
+
 func (c *Collection) All(out interface{}) error {
 	return c.db.wrapErrors(c.db.db.Find(out))
 }

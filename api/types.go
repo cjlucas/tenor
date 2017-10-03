@@ -483,6 +483,24 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Resolver: &artistConnectionResolver{},
 	})
 
+	schema.AddQuery(&Field{
+		Name: "album",
+		Type: albumObject,
+		Resolver: &idLookupResolver{
+			Collection: &dal.Albums.Collection,
+			Type:       db.Album{},
+		},
+	})
+
+	schema.AddQuery(&Field{
+		Name: "artist",
+		Type: artistObject,
+		Resolver: &idLookupResolver{
+			Collection: &dal.Artists.Collection,
+			Type:       db.Artist{},
+		},
+	})
+
 	return schema, schema.Build(dal)
 }
 
