@@ -192,10 +192,16 @@ func (s *Schema) buildArgument(resolver interface{}) (graphql.FieldConfigArgumen
 	for i := 0; i < resolverValue.Elem().NumField(); i++ {
 		field := resolverType.Elem().Field(i)
 		if name, ok := field.Tag.Lookup("args"); ok {
+			fieldType := resolverValue.Elem().Type().Field(i)
+
 			var input graphql.Input
 			switch resolverValue.Elem().Field(i).Interface().(type) {
 			case string:
-				input = graphql.String
+				if fieldType.Name == "ID" {
+					input = graphql.ID
+				} else {
+					input = graphql.String
+				}
 			case int:
 				input = graphql.Int
 			default:
