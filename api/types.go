@@ -522,7 +522,8 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 
 func (s *Schema) HandleFunc(w http.ResponseWriter, r *http.Request) {
 	type RequestBody struct {
-		Query string `json:"query"`
+		Query     string                 `json:"query"`
+		Variables map[string]interface{} `json:"variables"`
 	}
 
 	body, _ := ioutil.ReadAll(r.Body)
@@ -533,9 +534,10 @@ func (s *Schema) HandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := graphql.Do(graphql.Params{
-		Schema:        s.schema,
-		RequestString: query.Query,
-		Context:       context.TODO(),
+		Schema:         s.schema,
+		RequestString:  query.Query,
+		VariableValues: query.Variables,
+		Context:        context.TODO(),
 	})
 	if len(result.Errors) > 0 {
 		fmt.Printf("wrong result, unexpected errors: %v\n", result.Errors)
