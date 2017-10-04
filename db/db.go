@@ -23,6 +23,7 @@ type DB struct {
 	Artists *ArtistCollection
 	Albums  *AlbumCollection
 	Discs   *DiscCollection
+	Images  *ImageCollection
 }
 
 func Open(fpath string) (*DB, error) {
@@ -33,7 +34,7 @@ func Open(fpath string) (*DB, error) {
 
 	gdb.LogMode(true)
 
-	gdb.AutoMigrate(&Artist{}, &Track{}, &Disc{}, &Album{})
+	gdb.AutoMigrate(&Artist{}, &Track{}, &Disc{}, &Album{}, &Image{})
 
 	db := &DB{db: gdb}
 	db.init()
@@ -46,6 +47,7 @@ func (db *DB) init() {
 	db.Artists = &ArtistCollection{Collection{db.model(&Artist{})}}
 	db.Albums = &AlbumCollection{Collection{db.model(&Album{})}}
 	db.Discs = &DiscCollection{Collection{db.model(&Disc{})}}
+	db.Images = &ImageCollection{Collection{db.model(&Image{})}}
 }
 
 func (db *DB) model(i interface{}) *DB {
@@ -157,4 +159,16 @@ func (c *DiscCollection) FirstOrCreate(disc *Disc) error {
 	}
 
 	return c.Collection.FirstOrCreate(query, disc)
+}
+
+type ImageCollection struct {
+	Collection
+}
+
+func (c *ImageCollection) FirstOrCreate(image *Image) error {
+	query := map[string]interface{}{
+		"checksum": image.Checksum,
+	}
+
+	return c.Collection.FirstOrCreate(query, image)
 }

@@ -34,6 +34,12 @@ func (m *Model) BeforeUpdate(scope *gorm.Scope) error {
 	return nil
 }
 
+type Image struct {
+	Model
+
+	Checksum string `gorm:"index"`
+}
+
 type Track struct {
 	Model
 
@@ -50,6 +56,9 @@ type Track struct {
 
 	Disc   Disc
 	DiscID string `gorm:"index"`
+
+	Image   *Image
+	ImageID string
 }
 
 type Artist struct {

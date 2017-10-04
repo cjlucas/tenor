@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -71,6 +73,7 @@ func processDir(dal *db.DB, dirPath string) error {
 			TrackPosition   int
 			TotalTracks     int
 			TrackTitle      string
+			Image           []byte
 		}
 
 		var info Info
@@ -133,6 +136,26 @@ func processDir(dal *db.DB, dirPath string) error {
 		}
 
 		dal.Discs.FirstOrCreate(&disc)
+
+		var image db.Image
+		if len(parser.ID3v2) > 0 {
+			frames := parser.ID3v2[0].APICFrames()
+			if len(frames) > 0 {
+				frame := frames[0]
+
+				csum := md5.Sum(frame.Data)
+				csumStr := fmt.Sprintf("%x", csum[:])
+
+				image = db.Image{Checksum: csumStr}
+				dal.Images.FirstOrCreate(&image)
+
+				dir := path.Join(".images", string(csumStr[0]))
+				os.MkdirAll(dir, 0777)
+
+				fpath := path.Join(dir, csumStr)
+				ioutil.WriteFile(fpath, frame.Data, 0777)
+			}
+		}
 
 		var duration float64
 		if len(parser.MPEGHeaders) > 0 {

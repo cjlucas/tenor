@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"bytes"
 	"unicode/utf16"
 )
 
@@ -81,23 +82,13 @@ func (id3 *ID3v2) Parse(buf []byte) {
 	}
 }
 
-func trimTerminator(buf []byte, term []byte) []byte {
-	for i := 0; i < len(buf)-len(term)+1; i++ {
-		found := true
-		for j := 0; j < len(term); j++ {
-			if buf[i+j] != term[j] {
-				found = false
-				continue
-			}
-		}
-
-		if found {
-			return buf[:i]
-		}
-
+func splitTerminator(buf []byte, term []byte) ([]byte, []byte) {
+	parts := bytes.SplitN(buf, term, 2)
+	if len(parts) < 2 {
+		return parts[0], nil
 	}
 
-	return buf
+	return parts[0], parts[1]
 }
 
 func parseBOMString(buf []byte) string {
@@ -114,33 +105,47 @@ func parseBOMString(buf []byte) string {
 }
 
 func parseUTF16BEString(buf []byte) string {
-	text := trimTerminator(buf, []byte{0x00, 0x00})
-	//fmt.Println("OMGHERE", text)
-	points := make([]uint16, len(text)/2)
+	points := make([]uint16, len(buf)/2)
 	for i := 0; i < len(points); i++ {
-		points[i] = (uint16(text[i*2]) << 8) | uint16(text[(i*2)+1])
+		points[i] = (uint16(buf[i*2]) << 8) | uint16(buf[(i*2)+1])
 	}
 
 	return string(utf16.Decode(points))
+}
+
+func parseID3String(encoding int, buf []byte) (string, []byte) {
+	var term []byte
+	switch encoding {
+	case 0, 3:
+		term = []byte{0x00}
+	case 1, 2:
+		term = []byte{0x00, 0x00}
+	}
+
+	textBuf, rest := splitTerminator(buf, term)
+
+	var text string
+	switch encoding {
+	case 0, 3:
+		text = string(textBuf)
+	case 1:
+		if len(buf) > 2 {
+			text = parseBOMString(textBuf)
+		}
+	case 2:
+		text = parseUTF16BEString(textBuf)
+	default:
+		panic("unknown encoding")
+	}
+
+	return text, rest
 }
 
 func parseTextFrame(frame *ID3v2Frame) ID3v2TextFrame {
 	enc := frame.Payload[0]
 	buf := frame.Payload[1:]
 
-	var text string
-	switch enc {
-	case 0, 3:
-		text = string(trimTerminator(buf, []byte{0x00}))
-	case 1:
-		if len(buf) > 2 {
-			text = parseBOMString(buf)
-		}
-	case 2:
-		text = parseUTF16BEString(buf)
-	default:
-		panic("unknown encoding")
-	}
+	text, _ := parseID3String(int(enc), buf)
 
 	return ID3v2TextFrame{
 		ID:   frame.ID,
@@ -152,8 +157,31 @@ func (id3 *ID3v2) TextFrames() []ID3v2TextFrame {
 	var frames []ID3v2TextFrame
 	for i := range id3.Frames {
 		frame := &id3.Frames[i]
-		if frame.ID[0] == 'T' {
+		if frame.ID[0] == 'T' && frame.ID[1] != 'X' && frame.ID[2] != 'X' && frame.ID[3] != 'X' {
 			frames = append(frames, parseTextFrame(frame))
+		}
+	}
+
+	return frames
+}
+
+func (id3 *ID3v2) APICFrames() []APICFrame {
+	var frames []APICFrame
+	for i := range id3.Frames {
+		frame := &id3.Frames[i]
+		if frame.ID[0] == 'A' && frame.ID[1] == 'P' && frame.ID[2] == 'I' && frame.ID[3] == 'C' {
+			enc := int(frame.Payload[0])
+
+			mimeType, rest := parseID3String(enc, frame.Payload[1:])
+			picType := int(rest[0])
+			description, data := parseID3String(enc, rest[1:])
+
+			frames = append(frames, APICFrame{
+				MIMEType:    mimeType,
+				Type:        picType,
+				Description: description,
+				Data:        data,
+			})
 		}
 	}
 
@@ -175,4 +203,11 @@ type ID3v2Frame struct {
 type ID3v2TextFrame struct {
 	ID   string
 	Text string
+}
+
+type APICFrame struct {
+	MIMEType    string
+	Type        int
+	Description string
+	Data        []byte
 }
