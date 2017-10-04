@@ -448,6 +448,22 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		},
 	})
 
+	artistObject.AddField(&Field{
+		Name: "albumCount",
+		Type: graphql.Int,
+		Resolver: &instanceCountResolver{
+			Loader: NewArtistAlbumCountLoader(dal),
+		},
+	})
+
+	artistObject.AddField(&Field{
+		Name: "trackCount",
+		Type: graphql.Int,
+		Resolver: &instanceCountResolver{
+			Loader: NewArtistTrackCountLoader(dal),
+		},
+	})
+
 	trackObject.AddField(&Field{
 		Name: "album",
 		Type: albumObject,

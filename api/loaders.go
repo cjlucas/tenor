@@ -94,3 +94,61 @@ func NewBelongsToAssocLoader(coll *db.Collection, assocType interface{}) *datalo
 		dataloader.WithWait(1*time.Millisecond),
 	)
 }
+
+// Query must select two fields, one aliased to id and another aliased to count.
+// The query must also accept a single injected value, the list of ids to query against.
+func instanceCountLoader(db *db.DB, sql string) *dataloader.Loader {
+	fn := func(ctx context.Context, keys []string) []*dataloader.Result {
+		type Result struct {
+			ID    string
+			Count int
+		}
+
+		var results []Result
+		db.Raw(sql, keys).Scan(&results)
+
+		m := make(map[string]int)
+		for i := range results {
+			m[results[i].ID] = results[i].Count
+		}
+
+		var res []*dataloader.Result
+		for _, k := range keys {
+			res = append(res, &dataloader.Result{
+				Data: m[k],
+			})
+		}
+
+		return res
+	}
+
+	return dataloader.NewBatchedLoader(fn,
+		dataloader.WithCache(&dataloader.NoCache{}),
+		dataloader.WithWait(1*time.Millisecond),
+	)
+}
+
+func NewArtistAlbumCountLoader(db *db.DB) *dataloader.Loader {
+	sql := `
+        SELECT artists.id AS id, count(albums.id) AS count
+        FROM artists, albums
+        WHERE artists.id = albums.artist_id
+            AND artists.id IN (?)
+        GROUP BY artists.id
+        `
+
+	return instanceCountLoader(db, sql)
+}
+
+func NewArtistTrackCountLoader(db *db.DB) *dataloader.Loader {
+	sql := `
+	SELECT artists.id AS id, count(tracks.id) AS count
+	FROM artists, albums, tracks
+	WHERE artists.id = albums.artist_id
+		AND albums.id = tracks.album_id
+		AND artists.id IN (?)
+	GROUP BY artists.id
+	`
+
+	return instanceCountLoader(db, sql)
+}

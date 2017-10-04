@@ -141,3 +141,13 @@ func (r *idLookupResolver) Resolve(ctx context.Context) (interface{}, error) {
 
 	return val, err
 }
+
+type instanceCountResolver struct {
+	Loader *dataloader.Loader
+}
+
+func (r *instanceCountResolver) Resolve(ctx context.Context, artist *db.Artist) (int, error) {
+	res, err := r.Loader.Load(ctx, artist.ID)()
+
+	return res.(int), err
+}

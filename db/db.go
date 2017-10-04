@@ -63,6 +63,14 @@ func (db *DB) wrapErrors(gdb *gorm.DB) *Error {
 	return &Error{Errors: errors}
 }
 
+func (db *DB) Raw(sql string, vals ...interface{}) *DB {
+	return &DB{db: db.db.Raw(sql, vals...)}
+}
+
+func (db *DB) Scan(out interface{}) error {
+	return db.wrapErrors(db.db.Scan(out))
+}
+
 type Collection struct {
 	db *DB
 }
