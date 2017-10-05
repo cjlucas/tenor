@@ -31,8 +31,8 @@ type artistConnectionResolver struct {
 }
 
 func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, error) {
-	if r.First > 50 {
-		r.First = 50
+	if r.First > 500 {
+		r.First = 500
 	}
 
 	if r.OrderBy == "" {
