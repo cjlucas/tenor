@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	_ "image/jpeg"
 	_ "image/png"
@@ -104,6 +105,14 @@ func processDir(dal *db.DB, dirPath string) error {
 			info.TotalTracks = total
 		}
 
+		var stat syscall.Stat_t
+		if err := syscall.Stat(fpath, &stat); err != nil {
+			panic(err)
+		}
+
+		file := db.File{Inode: stat.Ino, Path: fpath}
+		dal.Files.FirstOrCreate(&file)
+
 		var artist db.Artist
 		if info.ArtistName != "" {
 			artist = db.Artist{Name: info.ArtistName}
@@ -126,26 +135,25 @@ func processDir(dal *db.DB, dirPath string) error {
 				csumStr := fmt.Sprintf("%x", csum[:])
 
 				_, imgType, err := image.Decode(bytes.NewReader(frame.Data))
-				if err != nil {
-					panic(err)
+				if err == nil {
+					var mimeType string
+					switch imgType {
+					case "png":
+						mimeType = "image/png"
+					case "jpeg":
+						mimeType = "image/jpeg"
+					}
+
+					img = db.Image{Checksum: csumStr, MIMEType: mimeType}
+					dal.Images.FirstOrCreate(&img)
+
+					dir := path.Join(".images", string(csumStr[0]))
+					os.MkdirAll(dir, 0777)
+
+					fpath := path.Join(dir, csumStr)
+					ioutil.WriteFile(fpath, frame.Data, 0777)
 				}
 
-				var mimeType string
-				switch imgType {
-				case "png":
-					mimeType = "image/png"
-				case "jpeg":
-					mimeType = "image/jpeg"
-				}
-
-				img = db.Image{Checksum: csumStr, MIMEType: mimeType}
-				dal.Images.FirstOrCreate(&img)
-
-				dir := path.Join(".images", string(csumStr[0]))
-				os.MkdirAll(dir, 0777)
-
-				fpath := path.Join(dir, csumStr)
-				ioutil.WriteFile(fpath, frame.Data, 0777)
 			}
 		}
 
@@ -184,6 +192,7 @@ func processDir(dal *db.DB, dirPath string) error {
 
 		track := db.Track{
 			Name:        id3Map["TIT2"],
+			FileID:      file.ID,
 			ArtistID:    artist.ID,
 			AlbumID:     album.ID,
 			DiscID:      disc.ID,

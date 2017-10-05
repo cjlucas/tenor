@@ -34,6 +34,13 @@ func (m *Model) BeforeUpdate(scope *gorm.Scope) error {
 	return nil
 }
 
+type File struct {
+	Model
+
+	Path  string
+	Inode uint64 `gorm:"index"`
+}
+
 type Image struct {
 	Model
 
@@ -49,6 +56,9 @@ type Track struct {
 	Position    int
 	TotalTracks int
 	Duration    float64
+
+	File   *File
+	FileID string
 
 	Artist   Artist
 	ArtistID string `gorm:"index"`

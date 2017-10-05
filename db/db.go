@@ -18,6 +18,7 @@ func (e *Error) Error() string {
 type DB struct {
 	db *gorm.DB
 
+	Files        *FileCollection
 	Tracks       *TrackCollection
 	Artists      *ArtistCollection
 	AlbumArtists *ArtistCollection
@@ -34,7 +35,7 @@ func Open(fpath string) (*DB, error) {
 
 	gdb.LogMode(true)
 
-	gdb.AutoMigrate(&Artist{}, &Track{}, &Disc{}, &Album{}, &Image{})
+	gdb.AutoMigrate(&File{}, &Artist{}, &Track{}, &Disc{}, &Album{}, &Image{})
 
 	db := &DB{db: gdb}
 	db.init()
@@ -43,6 +44,7 @@ func Open(fpath string) (*DB, error) {
 }
 
 func (db *DB) init() {
+	db.Files = &FileCollection{Collection{db.model(&File{})}}
 	db.Tracks = &TrackCollection{Collection{db.model(&Track{})}}
 	db.Artists = &ArtistCollection{Collection{db.model(&Artist{})}}
 	db.AlbumArtists = &ArtistCollection{
@@ -102,6 +104,14 @@ func (c *Collection) All(out interface{}) error {
 	return c.db.wrapErrors(c.db.db.Find(out))
 }
 
+func (c *Collection) Preload(column string) *Collection {
+	return &Collection{
+		&DB{
+			db: c.db.db.Preload(column),
+		},
+	}
+}
+
 func (c *Collection) Where(query interface{}, vals ...interface{}) *Collection {
 	return &Collection{
 		&DB{
@@ -129,6 +139,18 @@ func (c *Collection) Limit(count int) *Collection {
 func (c *Collection) ByID(id string, out interface{}) error {
 	query := map[string]interface{}{"id": id}
 	return c.Where(query).One(out)
+}
+
+type FileCollection struct {
+	Collection
+}
+
+func (c *FileCollection) FirstOrCreate(file *File) error {
+	query := map[string]interface{}{
+		"inode": file.Inode,
+	}
+
+	return c.Collection.FirstOrCreate(query, file)
 }
 
 type TrackCollection struct {
