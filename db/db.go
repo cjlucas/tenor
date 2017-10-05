@@ -12,18 +12,18 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	fmt.Println("DUDE HEREugh", e == nil)
 	return fmt.Sprintf("%s", e.Errors)
 }
 
 type DB struct {
 	db *gorm.DB
 
-	Tracks  *TrackCollection
-	Artists *ArtistCollection
-	Albums  *AlbumCollection
-	Discs   *DiscCollection
-	Images  *ImageCollection
+	Tracks       *TrackCollection
+	Artists      *ArtistCollection
+	AlbumArtists *ArtistCollection
+	Albums       *AlbumCollection
+	Discs        *DiscCollection
+	Images       *ImageCollection
 }
 
 func Open(fpath string) (*DB, error) {
@@ -45,6 +45,16 @@ func Open(fpath string) (*DB, error) {
 func (db *DB) init() {
 	db.Tracks = &TrackCollection{Collection{db.model(&Track{})}}
 	db.Artists = &ArtistCollection{Collection{db.model(&Artist{})}}
+	db.AlbumArtists = &ArtistCollection{
+		Collection{
+			&DB{
+				db: db.db.Model(&Artist{}).
+					Select("DISTINCT artists.id, artists.name").
+					Joins("JOIN albums ON albums.artist_id = artists.id"),
+			},
+		},
+	}
+
 	db.Albums = &AlbumCollection{Collection{db.model(&Album{})}}
 	db.Discs = &DiscCollection{Collection{db.model(&Disc{})}}
 	db.Images = &ImageCollection{Collection{db.model(&Image{})}}
@@ -57,7 +67,6 @@ func (db *DB) model(i interface{}) *DB {
 
 func (db *DB) wrapErrors(gdb *gorm.DB) *Error {
 	errors := gdb.GetErrors()
-	fmt.Println("GET ERRORS", errors)
 	if len(errors) == 0 {
 		return nil
 	}
@@ -117,6 +126,11 @@ func (c *Collection) Limit(count int) *Collection {
 	}
 }
 
+func (c *Collection) ByID(id string, out interface{}) error {
+	query := map[string]interface{}{"id": id}
+	return c.Where(query).One(out)
+}
+
 type TrackCollection struct {
 	Collection
 }
@@ -141,7 +155,7 @@ type AlbumCollection struct {
 
 func (c *AlbumCollection) FirstOrCreate(album *Album) error {
 	query := map[string]interface{}{
-		"title":     album.Title,
+		"name":      album.Name,
 		"artist_id": album.ArtistID,
 	}
 

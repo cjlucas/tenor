@@ -1,14 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
+	"image"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	_ "image/jpeg"
+	_ "image/png"
 
 	"github.com/cjlucas/tenor/db"
 	"github.com/cjlucas/tenor/parsers"
@@ -66,13 +71,13 @@ func processDir(dal *db.DB, dirPath string) error {
 		type Info struct {
 			ArtistName      string
 			AlbumArtistName string
-			AlbumTitle      string
-			DiscTitle       string
+			AlbumName       string
+			DiscName        string
 			DiscPosition    int
 			TotalDiscs      int
 			TrackPosition   int
 			TotalTracks     int
-			TrackTitle      string
+			TrackName       string
 			Image           []byte
 		}
 
@@ -91,7 +96,7 @@ func processDir(dal *db.DB, dirPath string) error {
 			info.AlbumArtistName = info.ArtistName
 		}
 
-		info.AlbumTitle = id3Map["TALB"]
+		info.AlbumName = id3Map["TALB"]
 
 		if s := id3Map["TRCK"]; s != "" {
 			pos, total := parseID3Position(s)
@@ -111,11 +116,45 @@ func processDir(dal *db.DB, dirPath string) error {
 			dal.Artists.FirstOrCreate(&albumArtist)
 		}
 
+		var img db.Image
+		if len(parser.ID3v2) > 0 {
+			frames := parser.ID3v2[0].APICFrames()
+			if len(frames) > 0 {
+				frame := frames[0]
+
+				csum := md5.Sum(frame.Data)
+				csumStr := fmt.Sprintf("%x", csum[:])
+
+				_, imgType, err := image.Decode(bytes.NewReader(frame.Data))
+				if err != nil {
+					panic(err)
+				}
+
+				var mimeType string
+				switch imgType {
+				case "png":
+					mimeType = "image/png"
+				case "jpeg":
+					mimeType = "image/jpeg"
+				}
+
+				img = db.Image{Checksum: csumStr, MIMEType: mimeType}
+				dal.Images.FirstOrCreate(&img)
+
+				dir := path.Join(".images", string(csumStr[0]))
+				os.MkdirAll(dir, 0777)
+
+				fpath := path.Join(dir, csumStr)
+				ioutil.WriteFile(fpath, frame.Data, 0777)
+			}
+		}
+
 		var album db.Album
-		if info.AlbumTitle != "" {
+		if info.AlbumName != "" {
 			album = db.Album{
-				Title:    info.AlbumTitle,
+				Name:     info.AlbumName,
 				ArtistID: albumArtist.ID,
+				ImageID:  img.ID,
 			}
 
 			dal.Albums.FirstOrCreate(&album)
@@ -130,32 +169,12 @@ func processDir(dal *db.DB, dirPath string) error {
 		}
 
 		disc := db.Disc{
-			Title:    info.DiscTitle,
+			Name:     info.DiscName,
 			Position: info.DiscPosition,
 			AlbumID:  album.ID,
 		}
 
 		dal.Discs.FirstOrCreate(&disc)
-
-		var image db.Image
-		if len(parser.ID3v2) > 0 {
-			frames := parser.ID3v2[0].APICFrames()
-			if len(frames) > 0 {
-				frame := frames[0]
-
-				csum := md5.Sum(frame.Data)
-				csumStr := fmt.Sprintf("%x", csum[:])
-
-				image = db.Image{Checksum: csumStr}
-				dal.Images.FirstOrCreate(&image)
-
-				dir := path.Join(".images", string(csumStr[0]))
-				os.MkdirAll(dir, 0777)
-
-				fpath := path.Join(dir, csumStr)
-				ioutil.WriteFile(fpath, frame.Data, 0777)
-			}
-		}
 
 		var duration float64
 		if len(parser.MPEGHeaders) > 0 {
@@ -164,10 +183,11 @@ func processDir(dal *db.DB, dirPath string) error {
 		}
 
 		track := db.Track{
-			Title:       id3Map["TIT2"],
+			Name:        id3Map["TIT2"],
 			ArtistID:    artist.ID,
 			AlbumID:     album.ID,
 			DiscID:      disc.ID,
+			ImageID:     img.ID,
 			Position:    info.TrackPosition,
 			TotalTracks: info.TotalTracks,
 			Duration:    duration,

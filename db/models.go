@@ -37,13 +37,15 @@ func (m *Model) BeforeUpdate(scope *gorm.Scope) error {
 type Image struct {
 	Model
 
+	MIMEType string
+
 	Checksum string `gorm:"index"`
 }
 
 type Track struct {
 	Model
 
-	Title       string
+	Name        string
 	Position    int
 	TotalTracks int
 	Duration    float64
@@ -73,18 +75,21 @@ type Artist struct {
 type Album struct {
 	Model
 
-	Title string
+	Name string
 
 	ArtistID string `gorm:"index"`
 
 	Discs  []Disc
 	Tracks []Track
+
+	Image   *Image
+	ImageID string
 }
 
 type Disc struct {
 	Model
 
-	Title    string
+	Name     string
 	Position int
 
 	Album   *Album

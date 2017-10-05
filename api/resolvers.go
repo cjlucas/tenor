@@ -39,7 +39,9 @@ func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, er
 		r.OrderBy = "name"
 	}
 
-	query := r.DB.Artists.Limit(r.First).Order(r.OrderBy, true)
+	r.OrderBy = fmt.Sprintf("artists.%s", r.OrderBy)
+
+	query := r.DB.AlbumArtists.Limit(r.First).Order(r.OrderBy, true)
 
 	if r.After != "" {
 		cursor, err := base64.StdEncoding.DecodeString(r.After)

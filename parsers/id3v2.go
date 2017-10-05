@@ -1,7 +1,7 @@
 package parsers
 
 import (
-	"bytes"
+	"fmt"
 	"unicode/utf16"
 )
 
@@ -83,12 +83,30 @@ func (id3 *ID3v2) Parse(buf []byte) {
 }
 
 func splitTerminator(buf []byte, term []byte) ([]byte, []byte) {
-	parts := bytes.SplitN(buf, term, 2)
-	if len(parts) < 2 {
-		return parts[0], nil
+	if len(buf) == 0 || len(term) == 0 {
+		return buf, nil
 	}
 
-	return parts[0], parts[1]
+	for i := 0; i < len(buf)-len(term)+1; i++ {
+		match := true
+		for j := 0; j < len(term); j++ {
+			if buf[i+j] != term[j] {
+				match = false
+				break
+			}
+		}
+
+		if match {
+			nextBuf, rest := splitTerminator(buf[i+1:], term)
+			if len(nextBuf) == 0 {
+				return buf[:i+1], rest
+			}
+
+			return buf[:i], buf[i+len(term):]
+		}
+	}
+
+	return buf, nil
 }
 
 func parseBOMString(buf []byte) string {
