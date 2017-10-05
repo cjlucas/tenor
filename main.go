@@ -50,5 +50,19 @@ func main() {
 		c.File(fpath)
 	})
 
+	router.GET("/stream/:id", func(c *gin.Context) {
+		id := c.Param("id")
+
+		var track db.Track
+		dal.Tracks.Preload("File").ByID(id, &track)
+
+		if track.ID == "" || track.File == nil {
+			c.AbortWithStatus(404)
+			return
+		}
+
+		c.File(track.File.Path)
+	})
+
 	router.Run(":4000")
 }
