@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	_ "image/jpeg"
 	_ "image/png"
@@ -208,6 +209,12 @@ func processDir(dal *db.DB, dirPath string) error {
 	})
 }
 
+type fileMetadata struct {
+	Path  string
+	Inode uint64
+	MTime time.Time
+}
+
 type trackMetadata struct {
 	TrackName     string
 	TrackPosition int
@@ -241,22 +248,44 @@ func (d *trackMetadata) FromID3v2(frame *parsers.ID3v2) {
 	d.TrackName = textFrameMap["TIT2"]
 	d.ArtistName = textFrameMap["TPE1"]
 	d.AlbumName = textFrameMap["TALB"]
+
+	if s := textFrameMap["TPE2"]; s != "" {
+		d.AlbumArtistName = s
+	} else {
+		d.AlbumArtistName = d.ArtistName
+	}
 }
 
 type artistKey struct {
 	Name string
 }
 
+type albumKey struct {
+	ArtistKey artistKey
+	Name      string
+}
+
+type discKey struct {
+	AlbumKey albumKey
+	Position int
+}
+
 type Scanner struct {
 	db *db.DB
 
-	artistCacne map[artistKey][]string
+	artistCacne      map[artistKey][]string
+	albumArtistCache map[artistKey][]string
+	albumCache       map[albumKey][]string
+	discCache        map[discKey][]string
 }
 
 func NewScanner(db *db.DB) *Scanner {
 	return &Scanner{
-		db:          db,
-		artistCacne: make(map[artistKey][]string),
+		db:               db,
+		artistCacne:      make(map[artistKey][]string),
+		albumArtistCache: make(map[artistKey][]string),
+		albumCache:       make(map[albumKey][]string),
+		discCache:        make(map[discKey][]string),
 	}
 }
 
@@ -285,7 +314,82 @@ func ScanFile(fpath string) (*trackMetadata, error) {
 	return &track, nil
 }
 
+func (s *Scanner) ScanBatch(fpaths []string) {
+	var metadata []fileMetadata
+	var inodes []uint64
+	for _, fpath := range fpaths {
+		var stat syscall.Stat_t
+		if err := syscall.Stat(fpath, &stat); err != nil {
+			continue
+		}
+
+		info, err := os.Stat(fpath)
+		if err != nil {
+			continue
+		}
+
+		metadata = append(metadata, fileMetadata{
+			Path:  fpath,
+			Inode: stat.Ino,
+			MTime: info.ModTime(),
+		})
+
+		inodes = append(inodes, stat.Ino)
+	}
+
+	var files []db.File
+	s.db.Files.Where("inode IN (?)", inodes).All(&files)
+
+	inodeFileMap := make(map[uint64]*db.File)
+
+	for i := range files {
+		f := &files[i]
+		inodeFileMap[f.Inode] = f
+	}
+
+	for i := range metadata {
+		mdata := metadata[i]
+		file := inodeFileMap[mdata.Inode]
+
+		trackInfo, err := ScanFile(mdata.Path)
+		if err != nil {
+			continue
+		}
+
+		if file == nil {
+			file = &db.File{
+				Path:  mdata.Path,
+				Inode: mdata.Inode,
+			}
+
+			s.db.Files.Create(file)
+		}
+
+		track := db.Track{
+			FileID:      file.ID,
+			Name:        trackInfo.TrackName,
+			Position:    trackInfo.TrackPosition,
+			TotalTracks: trackInfo.TotalTracks,
+		}
+
+		s.db.Tracks.Create(&track)
+
+		trackArtistKey := artistKey{Name: trackInfo.ArtistName}
+		s.artistCacne[trackArtistKey] = append(s.artistCacne[trackArtistKey], track.ID)
+
+		albumArtistKey := artistKey{Name: trackInfo.AlbumArtistName}
+		s.albumArtistCache[albumArtistKey] = append(s.albumArtistCache[albumArtistKey], track.ID)
+
+		albumKey := albumKey{ArtistKey: albumArtistKey, Name: trackInfo.AlbumName}
+		s.albumCache[albumKey] = append(s.albumCache[albumKey], track.ID)
+
+		discKey := discKey{AlbumKey: albumKey, Position: trackInfo.DiscPosition}
+		s.discCache[discKey] = append(s.discCache[discKey], track.ID)
+	}
+}
+
 func (s *Scanner) ScanDirectory(dirPath string) error {
+	var fpaths []string
 	err := filepath.Walk(dirPath, func(fpath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -295,21 +399,7 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 			return nil
 		}
 
-		trackInfo, err := ScanFile(fpath)
-		if err != nil {
-			return err
-		}
-
-		track := db.Track{
-			Name:        trackInfo.TrackName,
-			Position:    trackInfo.TrackPosition,
-			TotalTracks: trackInfo.TotalTracks,
-		}
-
-		s.db.Tracks.Create(&track)
-
-		artistKey := artistKey{Name: trackInfo.ArtistName}
-		s.artistCacne[artistKey] = append(s.artistCacne[artistKey], track.ID)
+		fpaths = append(fpaths, fpath)
 
 		return nil
 	})
@@ -318,11 +408,80 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 		return err
 	}
 
+	s.ScanBatch(fpaths)
+
+	artists := make(map[artistKey]*db.Artist)
 	for key, trackIDs := range s.artistCacne {
 		artist := db.Artist{Name: key.Name}
 		s.db.Artists.FirstOrCreate(&artist)
+		artists[key] = &artist
 
-		s.db.Exec("UPDATE tracks SET artist_id = ? WHERE id IN (?)", artist.ID, trackIDs)
+		for len(trackIDs) > 0 {
+			max := 500
+			if len(trackIDs) < max {
+				max = len(trackIDs)
+			}
+
+			ids := trackIDs[:max]
+			s.db.Exec("UPDATE tracks SET artist_id = ? WHERE id IN (?)", artist.ID, ids)
+			trackIDs = trackIDs[max:]
+		}
+	}
+
+	albumArtists := make(map[artistKey]*db.Artist)
+	for key := range s.albumArtistCache {
+		artist := artists[key]
+		if artist == nil {
+			artist = &db.Artist{Name: key.Name}
+			s.db.Artists.FirstOrCreate(artist)
+		}
+		albumArtists[key] = artist
+	}
+
+	albums := make(map[albumKey]*db.Album)
+	fmt.Println(albumArtists)
+	for key, trackIDs := range s.albumCache {
+		artist := albumArtists[key.ArtistKey]
+		if artist == nil {
+			panic("this should never happen")
+		}
+
+		album := db.Album{ArtistID: artist.ID, Name: key.Name}
+		s.db.Albums.FirstOrCreate(&album)
+		albums[key] = &album
+
+		for len(trackIDs) > 0 {
+			max := 500
+			if len(trackIDs) < max {
+				max = len(trackIDs)
+			}
+
+			ids := trackIDs[:max]
+			s.db.Exec("UPDATE tracks SET album_id = ? WHERE id IN (?)", album.ID, ids)
+			trackIDs = trackIDs[max:]
+		}
+
+	}
+
+	for key, trackIDs := range s.discCache {
+		album := albums[key.AlbumKey]
+		if album == nil {
+			panic("shouldnt happen")
+		}
+
+		disc := db.Disc{AlbumID: album.ID, Position: key.Position}
+		s.db.Discs.FirstOrCreate(&disc)
+
+		for len(trackIDs) > 0 {
+			max := 500
+			if len(trackIDs) < max {
+				max = len(trackIDs)
+			}
+
+			ids := trackIDs[:max]
+			s.db.Exec("UPDATE tracks SET disc_id = ? WHERE id IN (?)", disc.ID, ids)
+			trackIDs = trackIDs[max:]
+		}
 	}
 
 	return nil
