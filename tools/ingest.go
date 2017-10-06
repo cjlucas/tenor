@@ -401,6 +401,11 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 
 		fpaths = append(fpaths, fpath)
 
+		if len(fpaths) == 500 {
+			s.ScanBatch(fpaths)
+			fpaths = fpaths[:0]
+		}
+
 		return nil
 	})
 
