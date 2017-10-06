@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"image"
 	"io/ioutil"
@@ -207,14 +208,136 @@ func processDir(dal *db.DB, dirPath string) error {
 	})
 }
 
+type trackMetadata struct {
+	TrackName     string
+	TrackPosition int
+	TotalTracks   int
+	Duration      int
+
+	ArtistName      string
+	AlbumArtistName string
+
+	AlbumName string
+
+	DiscName     string
+	DiscPosition int
+	TotalDsics   int
+
+	Images [][]byte
+}
+
+func (d *trackMetadata) FromID3v2(frame *parsers.ID3v2) {
+	textFrameMap := make(map[string]string)
+	for _, frame := range frame.TextFrames() {
+		textFrameMap[frame.ID] = frame.Text
+	}
+
+	if s := textFrameMap["TRCK"]; s != "" {
+		pos, total := parseID3Position(s)
+		d.TrackPosition = pos
+		d.TotalTracks = total
+	}
+
+	d.TrackName = textFrameMap["TIT2"]
+	d.ArtistName = textFrameMap["TPE1"]
+	d.AlbumName = textFrameMap["TALB"]
+}
+
+type artistKey struct {
+	Name string
+}
+
+type Scanner struct {
+	db *db.DB
+
+	artistCacne map[artistKey][]string
+}
+
+func NewScanner(db *db.DB) *Scanner {
+	return &Scanner{
+		db:          db,
+		artistCacne: make(map[artistKey][]string),
+	}
+}
+
+func ScanFile(fpath string) (*trackMetadata, error) {
+	fp, err := os.Open(fpath)
+	if err != nil {
+		return nil, fmt.Errorf("Error opening file: %s", err)
+	}
+
+	defer fp.Close()
+
+	var parser parsers.MetadataParser
+	parser.Parse(fp)
+
+	var track trackMetadata
+
+	// Ignore files without tags (for now)
+	if len(parser.ID3v2) == 0 {
+		return nil, errors.New("no tags")
+	}
+
+	for _, frame := range parser.ID3v2 {
+		track.FromID3v2(&frame)
+	}
+
+	return &track, nil
+}
+
+func (s *Scanner) ScanDirectory(dirPath string) error {
+	err := filepath.Walk(dirPath, func(fpath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path.Ext(fpath) != ".mp3" {
+			return nil
+		}
+
+		trackInfo, err := ScanFile(fpath)
+		if err != nil {
+			return err
+		}
+
+		track := db.Track{
+			Name:        trackInfo.TrackName,
+			Position:    trackInfo.TrackPosition,
+			TotalTracks: trackInfo.TotalTracks,
+		}
+
+		s.db.Tracks.Create(&track)
+
+		artistKey := artistKey{Name: trackInfo.ArtistName}
+		s.artistCacne[artistKey] = append(s.artistCacne[artistKey], track.ID)
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	for key, trackIDs := range s.artistCacne {
+		artist := db.Artist{Name: key.Name}
+		s.db.Artists.FirstOrCreate(&artist)
+
+		s.db.Exec("UPDATE tracks SET artist_id = ? WHERE id IN (?)", artist.ID, trackIDs)
+	}
+
+	return nil
+}
+
 func main() {
 	dal, err := db.Open("dev.db")
 	if err != nil {
 		panic(err)
 	}
 
+	scanner := NewScanner(dal)
+
 	for _, path := range os.Args[1:] {
-		if err := processDir(dal, path); err != nil {
+		if err := scanner.ScanDirectory(path); err != nil {
 			panic(err)
 		}
 	}

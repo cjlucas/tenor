@@ -80,6 +80,10 @@ func (db *DB) Raw(sql string, vals ...interface{}) *DB {
 	return &DB{db: db.db.Raw(sql, vals...)}
 }
 
+func (db *DB) Exec(sql string, vals ...interface{}) error {
+	return db.wrapErrors(db.db.Exec(sql, vals...))
+}
+
 func (db *DB) Scan(out interface{}) error {
 	return db.wrapErrors(db.db.Scan(out))
 }
@@ -155,10 +159,6 @@ func (c *FileCollection) FirstOrCreate(file *File) error {
 
 type TrackCollection struct {
 	Collection
-}
-
-func (c *TrackCollection) FirstOrCrrete(track *Track) error {
-	return c.Collection.FirstOrCreate(track, track)
 }
 
 type ArtistCollection struct {
