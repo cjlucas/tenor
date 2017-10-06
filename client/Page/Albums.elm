@@ -56,7 +56,7 @@ albumSpec =
                 |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
     in
         GraphQL.object Album
-            |> GraphQL.with (GraphQL.field "id" [] GraphQL.string)
+            |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
             |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
             |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
             |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
@@ -127,7 +127,7 @@ loadAlbumsTask limit maybeCursor =
 
         albumSpec =
             GraphQL.object BasicAlbum
-                |> GraphQL.with (GraphQL.field "id" [] GraphQL.string)
+                |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                 |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
                 |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
                 |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))

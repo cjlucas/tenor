@@ -101,19 +101,19 @@ getArtist id outSpec =
 
 getAlbums limit maybeCursor outSpec =
     let
-        limitArg =
-            Var.required "limit" .limit Var.int
+        firstArg =
+            Var.required "first" .first Var.int
 
         afterArg =
             Var.required "after" .after (Var.nullable Var.string)
 
         args =
-            { limit = limit, after = Debug.log "after" maybeCursor }
+            { first = limit, after = Debug.log "after" maybeCursor }
 
         docSpec =
             extract
                 (field "albums"
-                    [ ( "limit", Arg.variable limitArg )
+                    [ ( "first", Arg.variable firstArg )
                     , ( "after", Arg.variable afterArg )
                     ]
                     outSpec
@@ -125,7 +125,7 @@ getAlbums limit maybeCursor outSpec =
 getAlbum id outSpec =
     let
         idVar =
-            Var.required "id" .id Var.string
+            Var.required "id" .id Var.id
 
         args =
             { id = id }
