@@ -470,6 +470,15 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		},
 	})
 
+	albumObject.AddField(&Field{
+		Name: "artist",
+		Type: artistObject,
+		Resolver: &belongsToAssocResolver{
+			FieldName: "ArtistID",
+			Loader:    NewBelongsToAssocLoader(&dal.Artists.Collection, &db.Artist{}),
+		},
+	})
+
 	trackObject.AddField(&Field{
 		Name: "album",
 		Type: albumObject,
@@ -500,9 +509,22 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	schema := NewSchema()
 
 	schema.AddQuery(&Field{
-		Name:     "artists",
-		Type:     ConnectionObject{Of: artistObject},
-		Resolver: &artistConnectionResolver{},
+		Name: "artists",
+		Type: ConnectionObject{Of: artistObject},
+		Resolver: &connectionResolver{
+			Collection: &dal.AlbumArtists.Collection,
+			Type:       db.Artist{},
+			TableName:  "artists",
+		},
+	})
+
+	schema.AddQuery(&Field{
+		Name: "albums",
+		Type: ConnectionObject{Of: albumObject},
+		Resolver: &connectionResolver{
+			Collection: &dal.Albums.Collection,
+			Type:       db.Album{},
+		},
 	})
 
 	schema.AddQuery(&Field{
@@ -538,6 +560,8 @@ func (s *Schema) HandleFunc(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &query); err != nil {
 		panic(err)
 	}
+
+	fmt.Println(query.Query)
 
 	result := graphql.Do(graphql.Params{
 		Schema:         s.schema,

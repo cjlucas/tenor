@@ -22,15 +22,20 @@ type Edge struct {
 	Node   interface{}
 }
 
-type artistConnectionResolver struct {
-	DB *db.DB
+type connectionResolver struct {
+	// Configuration
+	Collection     *db.Collection
+	Type           interface{}
+	TableName      string
+	SortableFields []string
 
+	// Parameters
 	First   int    `args:"first"`
 	After   string `args:"after"`
 	OrderBy string `args:"orderBy"`
 }
 
-func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, error) {
+func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 	if r.First > 500 {
 		r.First = 500
 	}
@@ -39,9 +44,11 @@ func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, er
 		r.OrderBy = "name"
 	}
 
-	r.OrderBy = fmt.Sprintf("artists.%s", r.OrderBy)
+	if r.TableName != "" {
+		r.OrderBy = fmt.Sprintf("artists.%s", r.OrderBy)
+	}
 
-	query := r.DB.AlbumArtists.Limit(r.First).Order(r.OrderBy, true)
+	query := r.Collection.Limit(r.First).Order(r.OrderBy, true)
 
 	if r.After != "" {
 		cursor, err := base64.StdEncoding.DecodeString(r.After)
@@ -57,15 +64,19 @@ func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, er
 		query = query.Where(parts[0]+" > ?", parts[1])
 	}
 
-	var artists []*db.Artist
-	err := query.All(&artists)
+	outType := reflect.TypeOf(r.Type)
+	outSlice := reflect.New(reflect.SliceOf(outType)).Elem()
+	query.All(outSlice.Addr().Interface())
 
 	var edges []Edge
-	for _, artist := range artists {
+
+	for i := 0; i < outSlice.Len(); i++ {
+		entry := outSlice.Index(i)
+
 		var val string
 		switch r.OrderBy {
 		case "name":
-			val = artist.Name
+			val = entry.FieldByName("Name").Interface().(string)
 		}
 
 		cursorBytes := []byte(r.OrderBy + ":" + val)
@@ -73,7 +84,7 @@ func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, er
 
 		edges = append(edges, Edge{
 			Cursor: cursor,
-			Node:   artist,
+			Node:   entry.Addr().Interface(),
 		})
 	}
 
@@ -82,7 +93,7 @@ func (r *artistConnectionResolver) Resolve(ctx context.Context) (*Connection, er
 		Edges:     edges,
 	}
 
-	return connection, err
+	return connection, nil
 }
 
 type hasManyAssocResolver struct {
