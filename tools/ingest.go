@@ -219,7 +219,7 @@ type trackMetadata struct {
 	TrackName     string
 	TrackPosition int
 	TotalTracks   int
-	Duration      int
+	Duration      float64
 
 	ArtistName      string
 	AlbumArtistName string
@@ -254,6 +254,18 @@ func (d *trackMetadata) FromID3v2(frame *parsers.ID3v2) {
 	} else {
 		d.AlbumArtistName = d.ArtistName
 	}
+
+	for _, frame := range frame.APICFrames() {
+		d.Images = append(d.Images, frame.Data)
+	}
+}
+
+func (d *trackMetadata) FromMPEGFrames(frames []parsers.MPEGHeader) {
+	if len(frames) > 0 {
+		hdr := frames[0]
+		d.Duration = float64(len(frames)) / (float64(hdr.SamplingRate()) / float64(hdr.NumSamples()))
+	}
+
 }
 
 type artistKey struct {
@@ -277,15 +289,21 @@ type Scanner struct {
 	albumArtistCache map[artistKey][]string
 	albumCache       map[albumKey][]string
 	discCache        map[discKey][]string
+	imageCache       map[string]string
+
+	albumModel map[albumKey]db.Album
 }
 
-func NewScanner(db *db.DB) *Scanner {
+func NewScanner(dal *db.DB) *Scanner {
 	return &Scanner{
-		db:               db,
+		db:               dal,
 		artistCacne:      make(map[artistKey][]string),
 		albumArtistCache: make(map[artistKey][]string),
 		albumCache:       make(map[albumKey][]string),
 		discCache:        make(map[discKey][]string),
+		imageCache:       make(map[string]string),
+
+		albumModel: make(map[albumKey]db.Album),
 	}
 }
 
@@ -309,6 +327,10 @@ func ScanFile(fpath string) (*trackMetadata, error) {
 
 	for _, frame := range parser.ID3v2 {
 		track.FromID3v2(&frame)
+	}
+
+	if len(parser.MPEGHeaders) > 0 {
+		track.FromMPEGFrames(parser.MPEGHeaders)
 	}
 
 	return &track, nil
@@ -365,11 +387,47 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 			s.db.Files.Create(file)
 		}
 
+		var imageID string
+		if len(trackInfo.Images) > 0 {
+			img := trackInfo.Images[0]
+
+			csum := md5.Sum(img)
+			csumStr := fmt.Sprintf("%x", csum[:])
+
+			imageID = s.imageCache[csumStr]
+			if imageID == "" {
+				_, imgType, err := image.Decode(bytes.NewReader(img))
+				if err == nil {
+					var mimeType string
+					switch imgType {
+					case "png":
+						mimeType = "image/png"
+					case "jpeg":
+						mimeType = "image/jpeg"
+					}
+
+					image := db.Image{Checksum: csumStr, MIMEType: mimeType}
+					s.db.Images.FirstOrCreate(&image)
+					imageID = image.ID
+					s.imageCache[csumStr] = imageID
+
+					dir := path.Join(".images", string(csumStr[0]))
+					os.MkdirAll(dir, 0777)
+
+					fpath := path.Join(dir, csumStr)
+					ioutil.WriteFile(fpath, img, 0777)
+				}
+			}
+
+		}
+
 		track := db.Track{
 			FileID:      file.ID,
+			ImageID:     imageID,
 			Name:        trackInfo.TrackName,
 			Position:    trackInfo.TrackPosition,
 			TotalTracks: trackInfo.TotalTracks,
+			Duration:    trackInfo.Duration,
 		}
 
 		s.db.Tracks.Create(&track)
@@ -382,6 +440,10 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 
 		albumKey := albumKey{ArtistKey: albumArtistKey, Name: trackInfo.AlbumName}
 		s.albumCache[albumKey] = append(s.albumCache[albumKey], track.ID)
+
+		if _, ok := s.albumModel[albumKey]; !ok {
+			s.albumModel[albumKey] = db.Album{ImageID: imageID}
+		}
 
 		discKey := discKey{AlbumKey: albumKey, Position: trackInfo.DiscPosition}
 		s.discCache[discKey] = append(s.discCache[discKey], track.ID)
@@ -451,7 +513,10 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 			panic("this should never happen")
 		}
 
-		album := db.Album{ArtistID: artist.ID, Name: key.Name}
+		album := s.albumModel[key]
+		album.ArtistID = artist.ID
+		album.Name = key.Name
+
 		s.db.Albums.FirstOrCreate(&album)
 		albums[key] = &album
 
