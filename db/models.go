@@ -52,10 +52,12 @@ type Image struct {
 type Track struct {
 	Model
 
-	Name        string
-	Position    int
-	TotalTracks int
-	Duration    float64
+	Name                string
+	Position            int
+	TotalTracks         int
+	Duration            float64
+	ReleaseDate         time.Time
+	OriginalReleaseDate time.Time
 
 	File   *File
 	FileID string
@@ -85,7 +87,10 @@ type Artist struct {
 type Album struct {
 	Model
 
-	Name string
+	Name                string
+	ReleaseDate         time.Time
+	OriginalReleaseDate time.Time
+	TotalDiscs          int
 
 	ArtistID string `gorm:"index"`
 

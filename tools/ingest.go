@@ -216,10 +216,12 @@ type fileMetadata struct {
 }
 
 type trackMetadata struct {
-	TrackName     string
-	TrackPosition int
-	TotalTracks   int
-	Duration      float64
+	TrackName           string
+	TrackPosition       int
+	TotalTracks         int
+	Duration            float64
+	ReleaseDate         time.Time
+	OriginalReleaseDate time.Time
 
 	ArtistName      string
 	AlbumArtistName string
@@ -228,9 +230,16 @@ type trackMetadata struct {
 
 	DiscName     string
 	DiscPosition int
-	TotalDsics   int
+	TotalDiscs   int
 
 	Images [][]byte
+}
+
+func parseTime(field *time.Time, val string) {
+	t, err := parsers.ParseID3Time(val)
+	if err == nil {
+		*field = t
+	}
 }
 
 func (d *trackMetadata) FromID3v2(frame *parsers.ID3v2) {
@@ -245,9 +254,39 @@ func (d *trackMetadata) FromID3v2(frame *parsers.ID3v2) {
 		d.TotalTracks = total
 	}
 
+	if s := textFrameMap["TPOS"]; s != "" {
+		pos, total := parseID3Position(s)
+		d.DiscPosition = pos
+		d.TotalDiscs = total
+	} else {
+		d.DiscPosition = 1
+	}
+
 	d.TrackName = textFrameMap["TIT2"]
 	d.ArtistName = textFrameMap["TPE1"]
 	d.AlbumName = textFrameMap["TALB"]
+	d.DiscName = textFrameMap["TSST"]
+	parseTime(&d.ReleaseDate, textFrameMap["TYER"]) // v2.3
+	parseTime(&d.ReleaseDate, textFrameMap["TDRC"]) // v2.4
+
+	if s, ok := textFrameMap["TDAT"]; ok && len(s) == 4 {
+		month, _ := strconv.Atoi(s[:2])
+		day, _ := strconv.Atoi(s[2:4])
+
+		if month <= 12 && day <= 31 {
+			d.ReleaseDate.AddDate(0, month, day)
+		}
+	}
+
+	parseTime(&d.OriginalReleaseDate, textFrameMap["TORY"]) // v2.3
+	parseTime(&d.OriginalReleaseDate, textFrameMap["TDRC"]) // v2.4
+
+	if d.ReleaseDate.IsZero() {
+		d.ReleaseDate = d.OriginalReleaseDate
+	}
+	if d.OriginalReleaseDate.IsZero() {
+		d.OriginalReleaseDate = d.ReleaseDate
+	}
 
 	if s := textFrameMap["TPE2"]; s != "" {
 		d.AlbumArtistName = s
@@ -292,6 +331,7 @@ type Scanner struct {
 	imageCache       map[string]string
 
 	albumModel map[albumKey]db.Album
+	discModel  map[discKey]db.Disc
 }
 
 func NewScanner(dal *db.DB) *Scanner {
@@ -304,6 +344,7 @@ func NewScanner(dal *db.DB) *Scanner {
 		imageCache:       make(map[string]string),
 
 		albumModel: make(map[albumKey]db.Album),
+		discModel:  make(map[discKey]db.Disc),
 	}
 }
 
@@ -423,12 +464,14 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 		}
 
 		track := db.Track{
-			FileID:      file.ID,
-			ImageID:     imageID,
-			Name:        trackInfo.TrackName,
-			Position:    trackInfo.TrackPosition,
-			TotalTracks: trackInfo.TotalTracks,
-			Duration:    trackInfo.Duration,
+			FileID:              file.ID,
+			ImageID:             imageID,
+			Name:                trackInfo.TrackName,
+			Position:            trackInfo.TrackPosition,
+			TotalTracks:         trackInfo.TotalTracks,
+			Duration:            trackInfo.Duration,
+			ReleaseDate:         trackInfo.ReleaseDate,
+			OriginalReleaseDate: trackInfo.OriginalReleaseDate,
 		}
 
 		s.db.Tracks.Create(&track)
@@ -443,11 +486,25 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 		s.albumCache[albumKey] = append(s.albumCache[albumKey], track.ID)
 
 		if _, ok := s.albumModel[albumKey]; !ok {
-			s.albumModel[albumKey] = db.Album{ImageID: imageID}
+			s.albumModel[albumKey] = db.Album{
+				Name:                albumKey.Name,
+				ReleaseDate:         trackInfo.ReleaseDate,
+				OriginalReleaseDate: trackInfo.OriginalReleaseDate,
+				TotalDiscs:          trackInfo.TotalDiscs,
+				ImageID:             imageID,
+			}
 		}
 
 		discKey := discKey{AlbumKey: albumKey, Position: trackInfo.DiscPosition}
 		s.discCache[discKey] = append(s.discCache[discKey], track.ID)
+
+		if _, ok := s.discModel[discKey]; !ok {
+			s.discModel[discKey] = db.Disc{
+				Name:     trackInfo.DiscName,
+				Position: trackInfo.DiscPosition,
+			}
+		}
+
 	}
 }
 
@@ -507,7 +564,6 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 	}
 
 	albums := make(map[albumKey]*db.Album)
-	fmt.Println(albumArtists)
 	for key, trackIDs := range s.albumCache {
 		artist := albumArtists[key.ArtistKey]
 		if artist == nil {
@@ -516,7 +572,6 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 
 		album := s.albumModel[key]
 		album.ArtistID = artist.ID
-		album.Name = key.Name
 
 		s.db.Albums.FirstOrCreate(&album)
 		albums[key] = &album
@@ -540,7 +595,9 @@ func (s *Scanner) ScanDirectory(dirPath string) error {
 			panic("shouldnt happen")
 		}
 
-		disc := db.Disc{AlbumID: album.ID, Position: key.Position}
+		disc := s.discModel[key]
+		disc.AlbumID = album.ID
+
 		s.db.Discs.FirstOrCreate(&disc)
 
 		for len(trackIDs) > 0 {

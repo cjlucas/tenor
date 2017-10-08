@@ -23,6 +23,7 @@ type DB struct {
 	Artists      *ArtistCollection
 	AlbumArtists *ArtistCollection
 	Albums       *AlbumCollection
+	AlbumsView   *AlbumCollection
 	Discs        *DiscCollection
 	Images       *ImageCollection
 }
@@ -54,7 +55,8 @@ func (db *DB) init() {
 			JOIN albums ON artists.id = albums.artist_id`),
 	}
 
-	db.Albums = &AlbumCollection{
+	db.Albums = &AlbumCollection{Collection{db.model(&Album{})}}
+	db.AlbumsView = &AlbumCollection{
 		db.createView("albums_artists_fields",
 			`SELECT albums.*, artists.name AS artist_name
 			FROM albums

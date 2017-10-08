@@ -525,9 +525,14 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Name: "albums",
 		Type: ConnectionObject{Of: albumObject},
 		Resolver: &connectionResolver{
-			Collection:       &dal.Albums.Collection,
-			Type:             db.Album{},
-			SortableFields:   []string{"name", "artist_name", "created_at"},
+			Collection: &dal.AlbumsView.Collection,
+			Type:       db.Album{},
+			SortableFields: []string{
+				"name",
+				"artist_name",
+				"release_date",
+				"created_at",
+			},
 			DefaultSortField: "name",
 		},
 	})

@@ -1,6 +1,8 @@
 package parsers
 
 import (
+	"errors"
+	"time"
 	"unicode/utf16"
 )
 
@@ -79,6 +81,26 @@ func (id3 *ID3v2) Parse(buf []byte) {
 
 		buf = buf[sz+10:]
 	}
+}
+
+var timestampFormats = []string{
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
+	"2006-01-02T15",
+	"2006-01-02",
+	"2006-01",
+	"2006",
+}
+
+func ParseID3Time(timeStr string) (time.Time, error) {
+	for i := range timestampFormats {
+		t, err := time.Parse(timestampFormats[i], timeStr)
+		if err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, errors.New("invalid time")
 }
 
 func splitTerminator(buf []byte, term []byte) ([]byte, []byte) {

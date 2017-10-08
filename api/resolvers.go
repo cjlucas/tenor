@@ -65,10 +65,17 @@ func (r *connectionResolver) encodeCursor(obj interface{}) string {
 	case "created_at":
 		t := value.FieldByName("CreatedAt").Interface().(time.Time)
 		val = t.Format(time.RFC3339Nano)
+	case "release_date":
+		var t time.Time
+		field := value.FieldByName("ReleaseDate")
+		if field.IsValid() {
+			t = field.Interface().(time.Time)
+		}
+		val = t.Format(time.RFC3339Nano)
 	}
 
 	id := value.FieldByName("ID").Interface().(string)
-	cursorBytes := []byte(r.OrderBy + ":" + val + ":" + id)
+	cursorBytes := []byte(r.OrderBy + "::" + val + "::" + id)
 	fmt.Println(string(cursorBytes))
 	cursor := base64.StdEncoding.EncodeToString(cursorBytes)
 
@@ -81,14 +88,14 @@ func (r *connectionResolver) decodeCursor(s string) (*cursor, error) {
 		return nil, errors.New("error decoding cursor")
 	}
 
-	parts := strings.SplitN(string(buf), ":", 3)
+	parts := strings.SplitN(string(buf), "::", 3)
 	if len(parts) < 3 {
 		return nil, errors.New("bad cursor")
 	}
 
 	var val interface{}
 	switch parts[0] {
-	case "created_at":
+	case "created_at", "release_date":
 		t, err := time.Parse(time.RFC3339Nano, parts[1])
 		if err != nil {
 			return nil, errors.New("bad cursor")

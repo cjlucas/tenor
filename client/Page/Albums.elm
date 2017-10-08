@@ -15,6 +15,7 @@ import Date exposing (Date)
 import Dom.Scroll
 import Dom
 import Dict exposing (Dict)
+import Set
 
 
 -- Model
@@ -26,6 +27,7 @@ type alias BasicAlbum =
     , imageId : Maybe String
     , artistName : String
     , createdAt : Date
+    , releaseDate : Date
     }
 
 
@@ -82,6 +84,7 @@ albumSpec =
 type Order
     = AlbumName
     | ArtistName
+    | ReleaseDate
 
 
 type alias Model =
@@ -95,13 +98,27 @@ type alias Model =
 setAlbums : List BasicAlbum -> Model -> Model
 setAlbums albums model =
     let
+        alpha =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                |> String.split ""
+                |> Set.fromList
+
+        toAlpha x =
+            if Set.member x alpha then
+                x
+            else
+                "#"
+
         keyer album =
             case model.sortOrder of
                 AlbumName ->
-                    String.left 1 album.name |> String.toUpper
+                    String.left 1 album.name |> String.toUpper |> toAlpha
 
                 ArtistName ->
-                    String.left 1 album.artistName |> String.toUpper
+                    String.left 1 album.artistName |> String.toUpper |> toAlpha
+
+                ReleaseDate ->
+                    Date.year album.releaseDate |> toString
 
         reducer album acc =
             let
@@ -186,6 +203,7 @@ loadAlbumsTask order limit maybeCursor =
                 |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
                 |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
                 |> GraphQL.with (dateField "createdAt" [])
+                |> GraphQL.with (dateField "releaseDate" [])
 
         connectionSpec =
             Api.connectionSpec "album" albumSpec
@@ -197,6 +215,9 @@ loadAlbumsTask order limit maybeCursor =
 
                 ArtistName ->
                     ( "artist_name", False )
+
+                ReleaseDate ->
+                    ( "release_date", False )
     in
         Api.getAlbums orderBy desc limit maybeCursor connectionSpec
             |> Api.sendRequest
@@ -379,7 +400,7 @@ viewModal album =
 viewHeader order =
     let
         buttons =
-            [ AlbumName, ArtistName ]
+            [ AlbumName, ArtistName, ReleaseDate ]
 
         viewButton sortOrder =
             let
@@ -390,6 +411,9 @@ viewHeader order =
 
                         ArtistName ->
                             "Artist Name"
+
+                        ReleaseDate ->
+                            "Release Date"
 
                 isDisabled =
                     order == sortOrder
