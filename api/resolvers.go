@@ -152,8 +152,13 @@ func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 		})
 	}
 
+	var endCursor string
+	if len(edges) > 0 {
+		endCursor = edges[len(edges)-1].Cursor
+	}
+
 	connection := &Connection{
-		EndCursor: edges[len(edges)-1].Cursor,
+		EndCursor: endCursor,
 		Edges:     edges,
 	}
 
