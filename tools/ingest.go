@@ -308,6 +308,7 @@ func NewScanner(dal *db.DB) *Scanner {
 }
 
 func ScanFile(fpath string) (*trackMetadata, error) {
+	fmt.Println(fpath)
 	fp, err := os.Open(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("Error opening file: %s", err)
