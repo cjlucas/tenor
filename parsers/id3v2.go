@@ -54,7 +54,7 @@ func (id3 *ID3v2) Parse(buf []byte) {
 		if hdr.MajorVersion == 4 {
 			sz = synchsafe(buf[4:8])
 		} else if hdr.MajorVersion == 3 {
-			sz = int(buf[0])<<24 | int(buf[1])<<16 | int(buf[2])<<8 | int(buf[3])
+			sz = int(buf[4])<<24 | int(buf[5])<<16 | int(buf[6])<<8 | int(buf[7])
 		} else {
 			panic("unknown major version")
 		}
