@@ -90,7 +90,8 @@ html, body {
   text-align: left;
   background-color: white;
   display: inline-block;
-  width: 500px;
+  max-width: 100%;
+  min-width: 40%;
   position: fixed;
   top: 50%;
   transform: translate(-50%, -50%);

@@ -16,6 +16,7 @@ import Dom.Scroll
 import Dom
 import Dict exposing (Dict)
 import Set
+import View.AlbumTracklist
 
 
 -- Model
@@ -358,18 +359,6 @@ viewModal album =
                 Nothing ->
                     text ""
 
-        viewTrack track =
-            let
-                duration =
-                    track.duration |> round |> Utils.durationText
-            in
-                div [ class "flex border-bottom pb2 pt1 mb1", onClick (SelectedTrack track.id) ]
-                    [ div [ class "flex-auto pointer" ]
-                        [ text (toString track.position ++ ". " ++ track.name)
-                        ]
-                    , div [] [ text duration ]
-                    ]
-
         viewContent =
             case album of
                 Just album ->
@@ -384,7 +373,9 @@ viewModal album =
                                     [ text album.artistName ]
                                 ]
                             ]
-                        , div [ class "overflow-scroll" ] (List.map viewTrack album.tracks)
+                        , div [ class "overflow-scroll" ]
+                            [ View.AlbumTracklist.view SelectedTrack album
+                            ]
                         ]
 
                 Nothing ->

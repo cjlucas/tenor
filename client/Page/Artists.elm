@@ -10,6 +10,7 @@ import GraphQL.Client.Http
 import Task exposing (Task)
 import List.Extra
 import Utils
+import View.AlbumTracklist
 
 
 -- Model
@@ -166,17 +167,6 @@ update msg model =
 
 viewAlbums model =
     let
-        duration track =
-            track.duration |> round |> Utils.durationText
-
-        viewTrack choseTrackMsg track =
-            div [ class "flex border-bottom pb2 pt1 mb1" ]
-                [ div [ class "flex-auto pointer", onClick (choseTrackMsg track.id) ]
-                    [ text (toString track.position ++ ". " ++ track.name)
-                    ]
-                , div [] [ text (duration track) ]
-                ]
-
         albumImage album =
             case album.imageId of
                 Just id ->
@@ -191,7 +181,7 @@ viewAlbums model =
                 [ div [ class "pr3" ] [ albumImage album ]
                 , div [ class "flex-auto" ]
                     [ div [ class "h1 pb2" ] [ text album.name ]
-                    , div [] (List.map (viewTrack (SelectedTrack album.id)) album.tracks)
+                    , View.AlbumTracklist.view (SelectedTrack album.id) album
                     ]
                 ]
             )
