@@ -18,14 +18,13 @@ func (e *Error) Error() string {
 type DB struct {
 	db *gorm.DB
 
-	Files                 *FileCollection
-	Tracks                *TrackCollection
-	Artists               *ArtistCollection
-	AlbumArtists          *ArtistCollection
-	Albums                *AlbumCollection
-	AlbumsByArtistNameAsc *AlbumCollection
-	Discs                 *DiscCollection
-	Images                *ImageCollection
+	Files        *FileCollection
+	Tracks       *TrackCollection
+	Artists      *ArtistCollection
+	AlbumArtists *ArtistCollection
+	Albums       *AlbumCollection
+	Discs        *DiscCollection
+	Images       *ImageCollection
 }
 
 func Open(fpath string) (*DB, error) {
@@ -49,13 +48,10 @@ func (db *DB) init() {
 	db.Tracks = &TrackCollection{Collection{db.model(&Track{})}}
 	db.Artists = &ArtistCollection{Collection{db.model(&Artist{})}}
 	db.AlbumArtists = &ArtistCollection{
-		Collection{
-			&DB{
-				db: db.db.Model(&Artist{}).
-					Select("DISTINCT artists.id, artists.name").
-					Joins("JOIN albums ON albums.artist_id = artists.id"),
-			},
-		},
+		db.createView("album_artists",
+			`SELECT DISTINCT artists.*
+			FROM artists
+			JOIN albums ON artists.id = albums.artist_id`),
 	}
 
 	db.Albums = &AlbumCollection{

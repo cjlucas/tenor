@@ -33,7 +33,6 @@ type connectionResolver struct {
 	// Configuration
 	Collection       *db.Collection
 	Type             interface{}
-	TableName        string
 	SortableFields   []string
 	DefaultSortField string
 
@@ -113,10 +112,6 @@ func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 
 	if !r.validSortableField() {
 		return nil, fmt.Errorf("%s is not a sortable field", r.OrderBy)
-	}
-
-	if r.TableName != "" {
-		r.OrderBy = fmt.Sprintf("%s.%s", r.TableName, r.OrderBy)
 	}
 
 	query := r.Collection.Limit(r.First)

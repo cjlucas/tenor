@@ -516,7 +516,6 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Resolver: &connectionResolver{
 			Collection:       &dal.AlbumArtists.Collection,
 			Type:             db.Artist{},
-			TableName:        "artists",
 			SortableFields:   []string{"name"},
 			DefaultSortField: "name",
 		},
