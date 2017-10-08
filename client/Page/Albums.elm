@@ -379,19 +379,32 @@ viewModal album =
 viewHeader order =
     let
         buttons =
-            [ ( "Album", AlbumName )
-            , ( "Artist", ArtistName )
-            ]
+            [ AlbumName, ArtistName ]
 
-        viewButton ( name, sortOrder ) =
+        viewButton sortOrder =
             let
+                btnText =
+                    case sortOrder of
+                        AlbumName ->
+                            "Album Name"
+
+                        ArtistName ->
+                            "Artist Name"
+
+                isDisabled =
+                    order == sortOrder
+
                 onClickAction =
                     if order /= sortOrder then
                         NewSortOrder sortOrder
                     else
                         NoOp
             in
-                button [ disabled (onClickAction == NoOp), onClick onClickAction ] [ text name ]
+                button
+                    [ disabled isDisabled
+                    , onClick onClickAction
+                    ]
+                    [ text btnText ]
     in
         div []
             ((h3 [] [ text "Sort By" ]) :: (List.map viewButton buttons))
