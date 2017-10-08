@@ -18,13 +18,14 @@ func (e *Error) Error() string {
 type DB struct {
 	db *gorm.DB
 
-	Files        *FileCollection
-	Tracks       *TrackCollection
-	Artists      *ArtistCollection
-	AlbumArtists *ArtistCollection
-	Albums       *AlbumCollection
-	Discs        *DiscCollection
-	Images       *ImageCollection
+	Files                 *FileCollection
+	Tracks                *TrackCollection
+	Artists               *ArtistCollection
+	AlbumArtists          *ArtistCollection
+	Albums                *AlbumCollection
+	AlbumsByArtistNameAsc *AlbumCollection
+	Discs                 *DiscCollection
+	Images                *ImageCollection
 }
 
 func Open(fpath string) (*DB, error) {
@@ -57,9 +58,26 @@ func (db *DB) init() {
 		},
 	}
 
-	db.Albums = &AlbumCollection{Collection{db.model(&Album{})}}
+	db.Albums = &AlbumCollection{
+		db.createView("albums_artists_fields",
+			`SELECT albums.*, artists.name AS artist_name
+			FROM albums
+			JOIN artists ON artists.id = albums.artist_id`),
+	}
+
 	db.Discs = &DiscCollection{Collection{db.model(&Disc{})}}
 	db.Images = &ImageCollection{Collection{db.model(&Image{})}}
+}
+
+func (db *DB) createView(name string, sql string) Collection {
+	db.Exec("DROP VIEW IF EXISTS " + name)
+	db.Exec("CREATE VIEW " + name + " AS " + sql)
+
+	return Collection{
+		&DB{
+			db: db.db.Table(name),
+		},
+	}
 }
 
 func (db *DB) model(i interface{}) *DB {
@@ -116,6 +134,14 @@ func (c *Collection) Preload(column string) *Collection {
 	}
 }
 
+func (c *Collection) Join(tableName string, on string, args ...interface{}) *Collection {
+	return &Collection{
+		&DB{
+			db: c.db.db.Joins("left join "+tableName+" on "+on, args...),
+		},
+	}
+}
+
 func (c *Collection) Where(query interface{}, vals ...interface{}) *Collection {
 	return &Collection{
 		&DB{
@@ -125,9 +151,15 @@ func (c *Collection) Where(query interface{}, vals ...interface{}) *Collection {
 }
 
 func (c *Collection) Order(field string, desc bool) *Collection {
+	var order string
+	if desc {
+		order = field + " DESC"
+	} else {
+		order = field + " ASC"
+	}
 	return &Collection{
 		&DB{
-			db: c.db.db.Order(field, desc),
+			db: c.db.db.Order(order),
 		},
 	}
 }

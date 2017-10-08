@@ -76,7 +76,7 @@ type Track struct {
 type Artist struct {
 	Model
 
-	Name string
+	Name string `gorm:"name"`
 
 	Albums []Album
 	Tracks []Track
@@ -94,6 +94,9 @@ type Album struct {
 
 	Image   *Image
 	ImageID string
+
+	// Fields in albums_artist_fields view
+	ArtistName string `gorm:"-"`
 }
 
 type Disc struct {

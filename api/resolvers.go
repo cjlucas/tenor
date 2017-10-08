@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/cjlucas/tenor/db"
 	"github.com/nicksrandall/dataloader"
@@ -22,17 +23,83 @@ type Edge struct {
 	Node   interface{}
 }
 
+type cursor struct {
+	SortField string
+	SortValue interface{}
+	ID        string
+}
+
 type connectionResolver struct {
 	// Configuration
-	Collection     *db.Collection
-	Type           interface{}
-	TableName      string
-	SortableFields []string
+	Collection       *db.Collection
+	Type             interface{}
+	TableName        string
+	SortableFields   []string
+	DefaultSortField string
 
 	// Parameters
-	First   int    `args:"first"`
-	After   string `args:"after"`
-	OrderBy string `args:"orderBy"`
+	First      int    `args:"first"`
+	Before     string `args:"before"`
+	After      string `args:"after"`
+	OrderBy    string `args:"orderBy"`
+	Descending bool   `args:"descending"`
+}
+
+func (r *connectionResolver) validSortableField() bool {
+	for _, field := range r.SortableFields {
+		if r.OrderBy == field {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *connectionResolver) encodeCursor(obj interface{}) string {
+	value := reflect.ValueOf(obj)
+	var val string
+	switch r.OrderBy {
+	case "name":
+		val = value.FieldByName("Name").Interface().(string)
+	case "artist_name":
+		val = value.FieldByName("ArtistName").Interface().(string)
+	case "created_at":
+		t := value.FieldByName("CreatedAt").Interface().(time.Time)
+		val = t.Format(time.RFC3339Nano)
+	}
+
+	id := value.FieldByName("ID").Interface().(string)
+	cursorBytes := []byte(r.OrderBy + ":" + val + ":" + id)
+	fmt.Println(string(cursorBytes))
+	cursor := base64.StdEncoding.EncodeToString(cursorBytes)
+
+	return cursor
+}
+
+func (r *connectionResolver) decodeCursor(s string) (*cursor, error) {
+	buf, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, errors.New("error decoding cursor")
+	}
+
+	parts := strings.SplitN(string(buf), ":", 3)
+	if len(parts) < 3 {
+		return nil, errors.New("bad cursor")
+	}
+
+	var val interface{}
+	switch parts[0] {
+	case "created_at":
+		t, err := time.Parse(time.RFC3339Nano, parts[1])
+		if err != nil {
+			return nil, errors.New("bad cursor")
+		}
+		val = t
+	default:
+		val = parts[1]
+	}
+
+	return &cursor{SortField: parts[0], SortValue: val, ID: parts[2]}, nil
 }
 
 func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
@@ -41,27 +108,33 @@ func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 	}
 
 	if r.OrderBy == "" {
-		r.OrderBy = "name"
+		r.OrderBy = r.DefaultSortField
+	}
+
+	if !r.validSortableField() {
+		return nil, fmt.Errorf("%s is not a sortable field", r.OrderBy)
 	}
 
 	if r.TableName != "" {
-		r.OrderBy = fmt.Sprintf("artists.%s", r.OrderBy)
+		r.OrderBy = fmt.Sprintf("%s.%s", r.TableName, r.OrderBy)
 	}
 
-	query := r.Collection.Limit(r.First).Order(r.OrderBy, true)
+	query := r.Collection.Limit(r.First)
+
+	query = query.Order(r.OrderBy, r.Descending).Order("id", false)
 
 	if r.After != "" {
-		cursor, err := base64.StdEncoding.DecodeString(r.After)
+		cursor, err := r.decodeCursor(r.After)
 		if err != nil {
-			return nil, errors.New("error decoding cursor")
+			return nil, fmt.Errorf("Error decoding cursor: %s", err)
 		}
-
-		parts := strings.SplitN(string(cursor), ":", 2)
-		if len(parts) < 2 {
-			return nil, errors.New("bad cursor")
+		query = query.Where(cursor.SortField+" > ? OR ("+cursor.SortField+" = ? AND id > ?)", cursor.SortValue, cursor.SortValue, cursor.ID)
+	} else if r.Before != "" {
+		cursor, err := r.decodeCursor(r.Before)
+		if err != nil {
+			return nil, fmt.Errorf("Error decoding cursor: %s", err)
 		}
-
-		query = query.Where(parts[0]+" > ?", parts[1])
+		query = query.Where(cursor.SortField+" < ? OR ("+cursor.SortField+" = ? AND id < ?)", cursor.SortValue, cursor.SortValue, cursor.ID)
 	}
 
 	outType := reflect.TypeOf(r.Type)
@@ -73,17 +146,8 @@ func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 	for i := 0; i < outSlice.Len(); i++ {
 		entry := outSlice.Index(i)
 
-		var val string
-		switch r.OrderBy {
-		case "name":
-			val = entry.FieldByName("Name").Interface().(string)
-		}
-
-		cursorBytes := []byte(r.OrderBy + ":" + val)
-		cursor := base64.StdEncoding.EncodeToString(cursorBytes)
-
 		edges = append(edges, Edge{
-			Cursor: cursor,
+			Cursor: r.encodeCursor(entry.Interface()),
 			Node:   entry.Addr().Interface(),
 		})
 	}

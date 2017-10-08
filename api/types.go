@@ -204,6 +204,8 @@ func (s *Schema) buildArgument(resolver interface{}) (graphql.FieldConfigArgumen
 				}
 			case int:
 				input = graphql.Int
+			case bool:
+				input = graphql.Boolean
 			default:
 				return nil, errors.New("unknown argument type")
 			}
@@ -512,9 +514,11 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Name: "artists",
 		Type: ConnectionObject{Of: artistObject},
 		Resolver: &connectionResolver{
-			Collection: &dal.AlbumArtists.Collection,
-			Type:       db.Artist{},
-			TableName:  "artists",
+			Collection:       &dal.AlbumArtists.Collection,
+			Type:             db.Artist{},
+			TableName:        "artists",
+			SortableFields:   []string{"name"},
+			DefaultSortField: "name",
 		},
 	})
 
@@ -522,8 +526,10 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Name: "albums",
 		Type: ConnectionObject{Of: albumObject},
 		Resolver: &connectionResolver{
-			Collection: &dal.Albums.Collection,
-			Type:       db.Album{},
+			Collection:       &dal.Albums.Collection,
+			Type:             db.Album{},
+			SortableFields:   []string{"name", "artist_name", "created_at"},
+			DefaultSortField: "name",
 		},
 	})
 
@@ -562,6 +568,7 @@ func (s *Schema) HandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println(query.Query)
+	fmt.Println(query.Variables)
 
 	result := graphql.Do(graphql.Params{
 		Schema:         s.schema,
