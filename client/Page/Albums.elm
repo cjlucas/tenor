@@ -11,6 +11,10 @@ import Json.Decode
 import List.Extra
 import InfiniteScroll as IS
 import Utils
+import Date exposing (Date)
+import Dom.Scroll
+import Dom
+import Dict exposing (Dict)
 
 
 -- Model
@@ -21,6 +25,7 @@ type alias BasicAlbum =
     , name : String
     , imageId : Maybe String
     , artistName : String
+    , createdAt : Date
     }
 
 
@@ -38,8 +43,18 @@ type alias Album =
     , name : String
     , imageId : Maybe String
     , artistName : String
+    , createdAt : Date
     , tracks : List Track
     }
+
+
+dateField name attrs =
+    GraphQL.assume
+        (GraphQL.field
+            name
+            attrs
+            (GraphQL.map (Result.toMaybe << Date.fromString) GraphQL.string)
+        )
 
 
 albumSpec =
@@ -60,14 +75,48 @@ albumSpec =
             |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
             |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
             |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+            |> GraphQL.with (dateField "createdAt" [])
             |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
 
 
+type Order
+    = AlbumName
+    | ArtistName
+
+
 type alias Model =
-    { albums : List BasicAlbum
+    { albums : Dict String (List BasicAlbum)
+    , sortOrder : Order
     , selectedAlbum : Maybe Album
     , infiniteScroll : IS.Model Msg
     }
+
+
+setAlbums : List BasicAlbum -> Model -> Model
+setAlbums albums model =
+    let
+        keyer album =
+            case model.sortOrder of
+                AlbumName ->
+                    String.left 1 album.name |> String.toUpper
+
+                ArtistName ->
+                    String.left 1 album.artistName |> String.toUpper
+
+        reducer album acc =
+            let
+                key =
+                    keyer album
+
+                albums =
+                    acc |> Dict.get key |> Maybe.withDefault []
+            in
+                Dict.insert key (albums ++ [ album ]) acc
+
+        albumsDict =
+            List.foldl reducer model.albums albums
+    in
+        { model | albums = albumsDict }
 
 
 
@@ -77,24 +126,27 @@ type alias Model =
 init =
     let
         model =
-            { albums = []
+            { albums = Dict.empty
+            , sortOrder = AlbumName
             , selectedAlbum = Nothing
-            , infiniteScroll = IS.init (loadAlbums 50 Nothing) |> IS.offset 2000
+            , infiniteScroll = IS.init (loadAlbums AlbumName 50 Nothing) |> IS.offset 2000
             }
 
         task =
-            loadAlbumsTask 50 Nothing
+            loadAlbumsTask model.sortOrder 50 Nothing
                 |> Task.andThen
                     (\connection ->
                         let
                             is =
                                 model.infiniteScroll
-                                    |> IS.loadMoreCmd (loadAlbums 50 (Just connection.endCursor))
+                                    |> IS.loadMoreCmd (loadAlbums model.sortOrder 50 (Just connection.endCursor))
+
+                            model_ =
+                                setAlbums (List.map .node connection.edges) model
                         in
                             Task.succeed
-                                { model
-                                    | albums = List.map .node connection.edges
-                                    , infiniteScroll = is
+                                { model_
+                                    | infiniteScroll = is
                                 }
                     )
     in
@@ -111,16 +163,18 @@ type OutMsg
 
 type Msg
     = NoOp
+    | NewSortOrder Order
     | FetchedAlbums (Result GraphQL.Client.Http.Error (Api.Connection BasicAlbum))
     | SelectedAlbum String
     | GotSelectedAlbum (Result GraphQL.Client.Http.Error Album)
     | SelectedTrack String
     | DismissModal
     | InfiniteScrollMsg IS.Msg
+    | NoopScroll (Result Dom.Error ())
 
 
-loadAlbumsTask : Int -> Maybe String -> Task GraphQL.Client.Http.Error (Api.Connection BasicAlbum)
-loadAlbumsTask limit maybeCursor =
+loadAlbumsTask : Order -> Int -> Maybe String -> Task GraphQL.Client.Http.Error (Api.Connection BasicAlbum)
+loadAlbumsTask order limit maybeCursor =
     let
         fromArtist f =
             GraphQL.field "artist" [] (GraphQL.extract f)
@@ -131,33 +185,62 @@ loadAlbumsTask limit maybeCursor =
                 |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
                 |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
                 |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+                |> GraphQL.with (dateField "createdAt" [])
 
         connectionSpec =
             Api.connectionSpec "album" albumSpec
+
+        ( orderBy, desc ) =
+            case order of
+                AlbumName ->
+                    ( "name", False )
+
+                ArtistName ->
+                    ( "artist_name", False )
     in
-        Api.getAlbums limit maybeCursor connectionSpec
+        Api.getAlbums orderBy desc limit maybeCursor connectionSpec
             |> Api.sendRequest
 
 
-loadAlbums : Int -> Maybe String -> IS.Direction -> Cmd Msg
-loadAlbums limit maybeCursor _ =
-    loadAlbumsTask limit maybeCursor
+loadAlbums : Order -> Int -> Maybe String -> IS.Direction -> Cmd Msg
+loadAlbums order limit maybeCursor _ =
+    loadAlbumsTask order limit maybeCursor
         |> Task.attempt FetchedAlbums
 
 
+update : Msg -> Model -> ( Model, Cmd Msg, Maybe OutMsg )
 update msg model =
-    case msg of
+    case Debug.log "msg " msg of
+        NewSortOrder order ->
+            let
+                is =
+                    model.infiniteScroll
+                        |> IS.stopLoading
+                        |> IS.loadMoreCmd (loadAlbums order 50 Nothing)
+
+                model_ =
+                    { model | albums = Dict.empty, sortOrder = order, infiniteScroll = is }
+
+                cmd =
+                    Cmd.batch
+                        [ loadAlbumsTask order 50 Nothing
+                            |> Task.attempt FetchedAlbums
+                        , Dom.Scroll.toY "viewport" 0 |> Task.attempt NoopScroll
+                        ]
+            in
+                ( model_, cmd, Nothing )
+
         FetchedAlbums (Ok connection) ->
             let
                 is =
                     model.infiniteScroll
                         |> IS.stopLoading
-                        |> IS.loadMoreCmd (loadAlbums 50 (Just connection.endCursor))
+                        |> IS.loadMoreCmd (loadAlbums model.sortOrder 50 (Just connection.endCursor))
 
-                albums =
-                    model.albums ++ (List.map .node connection.edges)
+                model_ =
+                    setAlbums (List.map .node connection.edges) model
             in
-                ( { model | albums = albums, infiniteScroll = is }, Cmd.none, Nothing )
+                ( { model_ | infiniteScroll = is }, Cmd.none, Nothing )
 
         FetchedAlbums (Err err) ->
             ( model, Cmd.none, Nothing )
@@ -204,6 +287,9 @@ update msg model =
                 ( { model | infiniteScroll = is }, cmd, Nothing )
 
         NoOp ->
+            ( model, Cmd.none, Nothing )
+
+        NoopScroll _ ->
             ( model, Cmd.none, Nothing )
 
 
@@ -290,9 +376,55 @@ viewModal album =
             [ viewContent ]
 
 
+viewHeader order =
+    let
+        buttons =
+            [ ( "Album", AlbumName )
+            , ( "Artist", ArtistName )
+            ]
+
+        viewButton ( name, sortOrder ) =
+            let
+                onClickAction =
+                    if order /= sortOrder then
+                        NewSortOrder sortOrder
+                    else
+                        NoOp
+            in
+                button [ disabled (onClickAction == NoOp), onClick onClickAction ] [ text name ]
+    in
+        div []
+            ((h3 [] [ text "Sort By" ]) :: (List.map viewButton buttons))
+
+
+viewAlbumSection : Dict String (List BasicAlbum) -> String -> Html Msg
+viewAlbumSection albums key =
+    let
+        albums_ =
+            Dict.get key albums |> Maybe.withDefault []
+    in
+        div []
+            [ h1 [] [ text key ]
+            , div [ class "flex flex-wrap" ] (List.map viewAlbum albums_)
+            ]
+
+
+viewAlbums albums =
+    let
+        keys =
+            Dict.keys albums |> List.sort
+    in
+        List.map (viewAlbumSection albums) keys
+
+
 view model =
-    div
-        [ class "main content flex flex-wrap mx-auto"
-        , IS.infiniteScroll InfiniteScrollMsg
+    div []
+        [ viewModal model.selectedAlbum
+        , viewHeader model.sortOrder
+        , div
+            [ class "main content mx-auto"
+            , id "viewport"
+            , IS.infiniteScroll InfiniteScrollMsg
+            ]
+            (viewAlbums model.albums)
         ]
-        ((viewModal model.selectedAlbum) :: (List.map viewAlbum model.albums))

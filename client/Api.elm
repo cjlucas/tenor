@@ -99,22 +99,40 @@ getArtist id outSpec =
         Query docSpec args
 
 
-getAlbums limit maybeCursor outSpec =
+getAlbums orderBy desc limit maybeCursor outSpec =
     let
         firstArg =
             Var.required "first" .first Var.int
 
-        afterArg =
-            Var.required "after" .after (Var.nullable Var.string)
+        orderByArg =
+            Var.required "orderBy" .orderBy Var.string
+
+        descArg =
+            Var.required "descending" .desc Var.bool
+
+        cursorArgName =
+            if desc then
+                "before"
+            else
+                "after"
+
+        cursorArg =
+            Var.required cursorArgName .cursor (Var.nullable Var.string)
 
         args =
-            { first = limit, after = Debug.log "after" maybeCursor }
+            { first = limit
+            , orderBy = orderBy
+            , desc = desc
+            , cursor = maybeCursor
+            }
 
         docSpec =
             extract
                 (field "albums"
                     [ ( "first", Arg.variable firstArg )
-                    , ( "after", Arg.variable afterArg )
+                    , ( "orderBy", Arg.variable orderByArg )
+                    , ( "descending", Arg.variable descArg )
+                    , ( cursorArgName, Arg.variable cursorArg )
                     ]
                     outSpec
                 )

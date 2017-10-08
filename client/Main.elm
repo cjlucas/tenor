@@ -219,7 +219,7 @@ type Msg
 
 
 update msg model =
-    case Debug.log "msg" msg of
+    case msg of
         LoadPage name ->
             case name of
                 Route.Artists ->
