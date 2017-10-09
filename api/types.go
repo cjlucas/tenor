@@ -511,6 +511,24 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	schema := NewSchema()
 
 	schema.AddQuery(&Field{
+		Name:     "searchArtists",
+		Type:     ListObject{Of: artistObject},
+		Resolver: newSearchResolver(dal, &dal.AlbumArtists.Collection, db.Artist{}),
+	})
+
+	schema.AddQuery(&Field{
+		Name:     "searchAlbums",
+		Type:     ListObject{Of: albumObject},
+		Resolver: newSearchResolver(dal, &dal.Albums.Collection, db.Album{}),
+	})
+
+	schema.AddQuery(&Field{
+		Name:     "searchTracks",
+		Type:     ListObject{Of: trackObject},
+		Resolver: newSearchResolver(dal, &dal.Tracks.Collection, db.Track{}),
+	})
+
+	schema.AddQuery(&Field{
 		Name: "artists",
 		Type: ConnectionObject{Of: artistObject},
 		Resolver: &connectionResolver{

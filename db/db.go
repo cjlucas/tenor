@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -79,8 +80,9 @@ func (db *DB) createView(name string, sql string) Collection {
 }
 
 func (db *DB) model(i interface{}) *DB {
-	db.db = db.db.Model(i)
-	return db
+	return &DB{
+		db: db.db.Model(i),
+	}
 }
 
 func (db *DB) wrapErrors(gdb *gorm.DB) *Error {
@@ -104,6 +106,10 @@ func (db *DB) Scan(out interface{}) error {
 	return db.wrapErrors(db.db.Scan(out))
 }
 
+func (db *DB) ScanRows(rows *sql.Rows, out interface{}) error {
+	return db.db.ScanRows(rows, out)
+}
+
 type Collection struct {
 	db *DB
 }
@@ -122,6 +128,10 @@ func (c *Collection) One(out interface{}) error {
 
 func (c *Collection) All(out interface{}) error {
 	return c.db.wrapErrors(c.db.db.Find(out))
+}
+
+func (c *Collection) Rows() (*sql.Rows, error) {
+	return c.db.db.Rows()
 }
 
 func (c *Collection) Preload(column string) *Collection {

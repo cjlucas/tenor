@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cjlucas/tenor/db"
+	"github.com/cjlucas/tenor/trie"
 	"github.com/nicksrandall/dataloader"
 )
 
@@ -234,4 +235,73 @@ func (r *instanceCountResolver) Resolve(ctx context.Context, artist *db.Artist) 
 	res, err := r.Loader.Load(ctx, artist.ID)()
 
 	return res.(int), err
+}
+
+type searchResolver struct {
+	Collection *db.Collection
+	Type       interface{}
+	Trie       *trie.Trie
+
+	Query string `args:"query"`
+}
+
+func newSearchResolver(db *db.DB, coll *db.Collection, model interface{}) *searchResolver {
+	modelType := reflect.TypeOf(model)
+	for modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
+	}
+
+	t := trie.New()
+	rows, _ := coll.Rows()
+
+	for rows.Next() {
+		val := reflect.New(modelType).Elem()
+		db.ScanRows(rows, val.Addr().Interface())
+
+		id := val.FieldByIndex([]int{0, 0}).Interface().(string)
+		name := val.FieldByName("Name").Interface().(string)
+
+		for _, s := range strings.Split(name, " ") {
+			t.Add(strings.TrimSpace(s), id)
+
+		}
+	}
+
+	rows.Close()
+
+	return &searchResolver{
+		Collection: coll,
+		Type:       model,
+		Trie:       t,
+	}
+}
+
+func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
+	sliceType := reflect.SliceOf(reflect.TypeOf(r.Type))
+	emptySlice := reflect.MakeSlice(sliceType, 0, 0).Interface()
+
+	var result *trie.LookupResult
+	for _, s := range strings.Split(r.Query, " ") {
+		res := r.Trie.Lookup(strings.TrimSpace(s))
+		if result == nil {
+			result = res
+		} else {
+			result = result.Intersection(res)
+		}
+	}
+
+	ids := result.ToSlice()
+
+	if len(ids) == 0 {
+		return emptySlice, nil
+	}
+
+	out := reflect.New(sliceType)
+	r.Collection.Where("id IN (?)", ids).All(out.Interface())
+
+	if out.IsNil() || out.Elem().Len() == 0 {
+		return emptySlice, nil
+	}
+
+	return out.Elem().Interface(), nil
 }
