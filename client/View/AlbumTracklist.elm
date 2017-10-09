@@ -7,29 +7,80 @@ import List.Extra
 import Utils
 
 
-view chooseTrackMsg album =
+viewTracks chooseTrackMsg showTrackArtist tracks =
     let
-        tracks =
-            album.tracks
-
         duration track =
             track.duration |> round |> Utils.durationText
 
         viewTrack track =
-            div [ class "flex border-bottom pb2 pt1 mb1" ]
-                [ div [ class "flex-auto pointer", onClick (chooseTrackMsg track.id) ]
-                    [ text (toString track.position ++ ". " ++ track.name)
+            let
+                viewTrackArtist =
+                    if showTrackArtist then
+                        div [ class "h5" ] [ text track.artistName ]
+                    else
+                        text ""
+            in
+                div [ class "col col-6 pl1 pr1 track" ]
+                    [ div [ class "flex pb1 pt2 pointer track-content", onClick (chooseTrackMsg track.id) ]
+                        [ div [ class "pr1 h4" ] [ text (toString track.position ++ ". ") ]
+                        , div [ class "flex-auto pr1" ]
+                            [ div [ class "pb1 h4" ] [ text track.name ]
+                            , viewTrackArtist
+                            ]
+                        , div [] [ text (duration track) ]
+                        ]
                     ]
-                , div [] [ text (duration track) ]
-                ]
 
         i =
             ((List.length tracks) |> toFloat) / 2 |> ceiling
 
         ( left, right ) =
             List.Extra.splitAt i tracks
+
+        rows =
+            List.Extra.interweave left right
+                |> List.Extra.greedyGroupsOf 2
+
+        viewRow row =
+            div [ class "flex flex-wrap track-list-row" ] (List.map viewTrack row)
     in
-        div [ class "claerfix" ]
-            [ div [ class "col sm-col-12 md-col-12 lg-col-6 pr2" ] (List.map viewTrack left)
-            , div [ class "col sm-col-12 md-col-12 lg-col-6 pr2" ] (List.map viewTrack right)
-            ]
+        div [ class "track-list" ] (List.map viewRow rows)
+
+
+discName disc =
+    case disc.name of
+        Just name ->
+            name
+
+        Nothing ->
+            "Disc " ++ (toString disc.position)
+
+
+view chooseTrackMsg album =
+    let
+        discs =
+            List.sortBy .position album.discs
+
+        numTrackArtists =
+            discs
+                |> List.concatMap .tracks
+                |> List.map .artistName
+                |> List.Extra.unique
+                |> List.length
+
+        showTrackArtists =
+            numTrackArtists > 1
+
+        discHeader disc =
+            if List.length album.discs > 1 then
+                div [ class "h3 bold pb2" ] [ text (discName disc) ]
+            else
+                text ""
+
+        viewDisc disc =
+            div [ class "pb1" ]
+                [ discHeader disc
+                , viewTracks chooseTrackMsg showTrackArtists disc.tracks
+                ]
+    in
+        div [] (List.map viewDisc discs)

@@ -21,7 +21,15 @@ type alias Track =
     , position : Int
     , duration : Float
     , name : String
+    , artistName : String
     , imageId : Maybe String
+    }
+
+
+type alias Disc =
+    { name : Maybe String
+    , position : Int
+    , tracks : List Track
     }
 
 
@@ -29,7 +37,7 @@ type alias Album =
     { id : String
     , name : String
     , imageId : Maybe String
-    , tracks : List Track
+    , discs : List Disc
     }
 
 
@@ -107,23 +115,33 @@ type Msg
 
 
 update msg model =
-    case msg of
+    case Debug.log "omg" msg of
         SelectedArtist id ->
             let
+                fromArtist f =
+                    GraphQL.field "artist" [] (GraphQL.extract f)
+
                 trackSpec =
                     GraphQL.object Track
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                         |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
                         |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
                         |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                        |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
                         |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+
+                discSpec =
+                    GraphQL.object Disc
+                        |> GraphQL.with (GraphQL.field "name" [] (GraphQL.nullable GraphQL.string))
+                        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+                        |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
 
                 albumSpec =
                     GraphQL.object Album
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                         |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
                         |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
-                        |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
+                        |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
 
                 artistSpec =
                     GraphQL.object Artist
@@ -149,7 +167,8 @@ update msg model =
                 tracks =
                     case maybeAlbum of
                         Just album ->
-                            album.tracks
+                            album.discs
+                                |> List.concatMap .tracks
                                 |> List.Extra.dropWhile (\x -> x.id /= trackId)
 
                         Nothing ->

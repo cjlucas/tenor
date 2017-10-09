@@ -32,11 +32,19 @@ type alias BasicAlbum =
     }
 
 
+type alias Disc =
+    { name : Maybe String
+    , position : Int
+    , tracks : List Track
+    }
+
+
 type alias Track =
     { id : String
     , position : Int
     , duration : Float
     , name : String
+    , artistName : String
     , imageId : Maybe String
     }
 
@@ -47,7 +55,7 @@ type alias Album =
     , imageId : Maybe String
     , artistName : String
     , createdAt : Date
-    , tracks : List Track
+    , discs : List Disc
     }
 
 
@@ -71,7 +79,14 @@ albumSpec =
                 |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
                 |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
                 |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+                |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
                 |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+
+        discSpec =
+            GraphQL.object Disc
+                |> GraphQL.with (GraphQL.field "name" [] (GraphQL.nullable GraphQL.string))
+                |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+                |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
     in
         GraphQL.object Album
             |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
@@ -79,7 +94,7 @@ albumSpec =
             |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
             |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
             |> GraphQL.with (dateField "createdAt" [])
-            |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
+            |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
 
 
 type Order
@@ -286,7 +301,7 @@ update msg model =
             let
                 tracks =
                     model.selectedAlbum
-                        |> Maybe.andThen (Just << .tracks)
+                        |> Maybe.andThen (Just << List.concatMap .tracks << .discs)
                         |> Maybe.withDefault []
                         |> List.Extra.dropWhile (\track -> track.id /= id)
 

@@ -149,6 +149,7 @@ type alias Track =
     , position : Int
     , duration : Float
     , name : String
+    , artistName : String
     , imageId : Maybe String
     }
 
