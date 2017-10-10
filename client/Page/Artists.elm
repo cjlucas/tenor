@@ -11,6 +11,8 @@ import Task exposing (Task)
 import List.Extra
 import Utils
 import View.AlbumTracklist
+import Dom
+import Dom.Scroll
 
 
 -- Model
@@ -112,6 +114,7 @@ type Msg
     = SelectedArtist String
     | GotArtist (Result GraphQL.Client.Http.Error Artist)
     | SelectedTrack String String
+    | NoopScroll (Result Dom.Error ())
 
 
 update msg model =
@@ -156,7 +159,11 @@ update msg model =
                 ( model, cmd, Nothing )
 
         GotArtist (Ok artist) ->
-            ( { model | selectedArtist = Just artist }, Cmd.none, Nothing )
+            let
+                cmd =
+                    Dom.Scroll.toY "albums" 0 |> Task.attempt NoopScroll
+            in
+                ( { model | selectedArtist = Just artist }, cmd, Nothing )
 
         SelectedTrack albumId trackId ->
             let
@@ -199,7 +206,7 @@ viewAlbums model =
             , div [ class "flex pb4 album" ]
                 [ div [ class "pr3" ] [ albumImage album ]
                 , div [ class "flex-auto" ]
-                    [ div [ class "h1 pb2" ] [ text album.name ]
+                    [ div [ class "h2 bold pb2" ] [ text album.name ]
                     , View.AlbumTracklist.view (SelectedTrack album.id) album
                     ]
                 ]
@@ -208,7 +215,7 @@ viewAlbums model =
         case model.selectedArtist of
             Just artist ->
                 div []
-                    [ div [ class "h1 pb1 mb3 border-bottom" ] [ text "Jack Johnson" ]
+                    [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
                     , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
                     ]
 
@@ -225,7 +232,7 @@ viewArtist artist =
                     "album"
                   else
                     "albums"
-                , "-"
+                , "·"
                 , toString artist.trackCount
                 , if artist.trackCount == 1 then
                     "track"
@@ -233,13 +240,15 @@ viewArtist artist =
                     "tracks"
                 ]
     in
-        div [ class "pointer right-align border-bottom" ]
+        div
+            [ class "pointer right-align border-bottom"
+            , onClick (SelectedArtist artist.id)
+            ]
             [ div
-                [ class "h3 pb1 pt2"
-                , onClick (SelectedArtist artist.id)
+                [ class "h3 bold pb1 pt2"
                 ]
                 [ text artist.name ]
-            , div [ class "h4 pb1" ] [ text artistInfo ]
+            , div [ class "h5 pb1" ] [ text artistInfo ]
             ]
 
 
@@ -247,5 +256,5 @@ view model =
     div [ class "main flex" ]
         [ div [ class "sidebar pr3" ] (List.map viewArtist model.artists)
         , span [ class "divider mt2 mb2" ] []
-        , div [ class "content flex-auto pl4 pr4 mb4" ] [ viewAlbums model ]
+        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2" ] [ viewAlbums model ]
         ]

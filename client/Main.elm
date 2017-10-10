@@ -568,14 +568,14 @@ viewNowPlaying player =
                 in
                     div [ class "now-playing flex align-middle" ]
                         [ div [ class "flex controls" ]
-                            [ i [ class "p1 fa fa-backward", onClick PlayPrevious ] []
+                            [ i [ class "p1 fa fa-2x fa-backward", onClick PlayPrevious ] []
                             , playPauseIcon
-                            , i [ class "p1 fa fa-forward", onClick PlayNext ] []
+                            , i [ class "p1 fa fa-2x fa-forward", onClick PlayNext ] []
                             ]
                         , image
                         , div [ class "flex flex-column justify-center" ]
                             [ div [ class "h4 bold" ] [ text track.name ]
-                            , div [ class "h5" ] [ text "Jack Johnson - All the Light Above it Too" ]
+                            , div [ class "h5" ] [ text track.artistName ]
                             , div [ class "h5 bold align-bottom" ] [ text "Up Next: Something Else" ]
                             ]
                         ]
@@ -593,15 +593,18 @@ viewHeader player =
             ]
                 |> List.map
                     (\( item, pageNmae ) ->
-                        li [ class "h3 inline-block m2", onClick (LoadPage pageNmae) ]
+                        li [ class "h4 inline-block m2", onClick (LoadPage pageNmae) ]
                             [ text item ]
                     )
 
         viewMenu =
-            ul [ class "ml2 mr2 list-reset" ] viewItems
+            ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
     in
         div [ class "header flex pl1 pr1 justify-between items-center border-bottom" ]
-            [ viewMenu
+            [ div [ class "flex items-center pl2" ]
+                [ span [ class "logo" ] [ text "Tenor" ]
+                , viewMenu
+                ]
             , viewNowPlaying player
             ]
 

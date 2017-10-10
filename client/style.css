@@ -1,3 +1,18 @@
+@font-face {
+  font-family: 'AvenirNext';
+  src: url('fonts/AvenirNext-Regular.ttf');
+}
+
+@font-face {
+  font-family: 'AvenirNextBold';
+  src: url('fonts/AvenirNext-Bold.ttf');
+}
+
+@font-face {
+  font-family: 'Lobster';
+  src: url('fonts/Lobster_1.3.otf');
+}
+
 /* Prevent full screen rubber-banding.
  * Individual divs with overflow: scroll will still have bounce.
  */
@@ -5,6 +20,21 @@ html, body {
   height: 100%;
   overflow: hidden;
   /*background-color: pink;*/
+  font-family: 'AvenirNext';
+}
+
+.logo::first-letter {
+  font-size: 140%;
+}
+
+.logo {
+  font-family: 'Lobster';
+  font-size: 2.6em;
+}
+
+.bold {
+  font-family: 'AvenirNextBold' !important;
+  font-weight: normal;
 }
 
 /*
@@ -42,7 +72,7 @@ html, body {
 }
 
 .album img {
-  max-width: 350px;
+  max-width: 300px;
 }
 
 .pointer {
@@ -50,7 +80,7 @@ html, body {
 }
 
 .header {
-  height: 60px;
+  height: 80px;
 }
 
 .now-playing {
@@ -67,13 +97,17 @@ html, body {
 }
 
 .controls > .fa-pause, .controls > .fa-play {
-  font-size: 1.25em;
+  font-size: 2.25em;
 }
 
 .divider {
   width: 1px;
   height: 90%;
-  background-color: black;
+  background-color: rgba(151, 151, 151, .25);
+}
+
+.border-bottom {
+  border-color: rgba(151, 151, 151, .25) !important;
 }
 
 .modal {
@@ -104,4 +138,12 @@ html, body {
 .overflow-scroll {
   max-height: 50vh;
   overflow-y: scroll;
+}
+
+.track-list-row:first-child .track-content {
+  border: 0;
+}
+
+.track-list-row .track-content {
+  border-top: 1px solid rgba(151, 151, 151, .25);
 }

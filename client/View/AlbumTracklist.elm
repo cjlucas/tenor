@@ -16,18 +16,18 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
             let
                 viewTrackArtist =
                     if showTrackArtist then
-                        div [ class "h5" ] [ text track.artistName ]
+                        div [ class "h6" ] [ text track.artistName ]
                     else
                         text ""
             in
                 div [ class "col col-6 pl1 pr1 track" ]
                     [ div [ class "flex pb1 pt2 pointer track-content", onClick (chooseTrackMsg track.id) ]
-                        [ div [ class "pr1 h4" ] [ text (toString track.position ++ ". ") ]
+                        [ div [ class "pr1 h5" ] [ text (toString track.position ++ ". ") ]
                         , div [ class "flex-auto pr1" ]
-                            [ div [ class "pb1 h4" ] [ text track.name ]
+                            [ div [ class "pb1 h5" ] [ text track.name ]
                             , viewTrackArtist
                             ]
-                        , div [] [ text (duration track) ]
+                        , div [ class "h5" ] [ text (duration track) ]
                         ]
                     ]
 
@@ -44,7 +44,7 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
         viewRow row =
             div [ class "flex flex-wrap track-list-row" ] (List.map viewTrack row)
     in
-        div [ class "track-list" ] (List.map viewRow rows)
+        div [ class "track-list pb2" ] (List.map viewRow rows)
 
 
 discName disc =
@@ -73,7 +73,7 @@ view chooseTrackMsg album =
 
         discHeader disc =
             if List.length album.discs > 1 then
-                div [ class "h3 bold pb2" ] [ text (discName disc) ]
+                div [ class "h3 bold" ] [ text (discName disc) ]
             else
                 text ""
 

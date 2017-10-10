@@ -352,9 +352,9 @@ viewAlbum album =
                 Nothing ->
                     text ""
     in
-        div [ class "col sm-col-6 md-col-4 lg-col-3 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
+        div [ class "col sm-col-6 md-col-3 lg-col-2 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
             [ albumImg
-            , div [ class "h3 bold" ] [ text album.name ]
+            , div [ class "h3 bold pt1" ] [ text album.name ]
             , div [ class "h4" ] [ text album.artistName ]
             ]
 
