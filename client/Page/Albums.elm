@@ -447,7 +447,7 @@ viewAlbumSection albums key =
             Dict.get key albums |> Maybe.withDefault []
     in
         div []
-            [ h1 [] [ text key ]
+            [ div [ class "h1 bold pb3" ] [ text key ]
             , div [ class "flex flex-wrap" ] (List.map viewAlbum albums_)
             ]
 
@@ -463,11 +463,12 @@ viewAlbums albums =
 view model =
     div []
         [ viewModal model.selectedAlbum
-        , viewHeader model.sortOrder
         , div
             [ class "main content mx-auto"
             , id "viewport"
             , IS.infiniteScroll InfiniteScrollMsg
             ]
-            (viewAlbums model.albums)
+            ((viewHeader model.sortOrder)
+                :: (viewAlbums model.albums)
+            )
         ]
