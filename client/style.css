@@ -25,7 +25,7 @@ html, body {
 }
 
 .logo::first-letter {
-  font-size: 140%;
+  font-size: 120%;
 }
 
 .logo {
@@ -148,6 +148,10 @@ html, body {
 
 .track-list-row .track-content {
   border-top: 1px solid rgba(151, 151, 151, .25);
+}
+
+.track .track-artist {
+  color: rgba(74, 74, 74, .7);
 }
 
 /* Ensure div containing image is square */

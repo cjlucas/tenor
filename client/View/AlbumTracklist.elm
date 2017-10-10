@@ -16,7 +16,7 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
             let
                 viewTrackArtist =
                     if showTrackArtist then
-                        div [ class "h6" ] [ text track.artistName ]
+                        div [ class "h6 track-artist" ] [ text track.artistName ]
                     else
                         text ""
             in
