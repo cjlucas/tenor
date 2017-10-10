@@ -159,5 +159,6 @@ html, body {
 /* Take image out of normal flow, allowing .box to essentially flow underneath the image */
 .box > img {
   position: absolute;
-  width: 100%;
+  object-fit: contain;
+  max-height: 100%;
 }
