@@ -150,6 +150,10 @@ html, body {
   border-top: 1px solid rgba(151, 151, 151, .25);
 }
 
+.track .track-position {
+  min-width: 1.2rem;
+}
+
 .track .track-artist {
   color: rgba(74, 74, 74, .7);
 }

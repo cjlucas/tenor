@@ -22,7 +22,7 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
             in
                 div [ class "col col-6 pl1 pr1 track" ]
                     [ div [ class "flex pb1 pt2 pointer track-content", onClick (chooseTrackMsg track.id) ]
-                        [ div [ class "pr1 h5" ] [ text (toString track.position ++ ". ") ]
+                        [ div [ class "pr1 h5 track-position" ] [ text (toString track.position ++ ". ") ]
                         , div [ class "flex-auto pr1" ]
                             [ div [ class "pb1 h5" ] [ text track.name ]
                             , viewTrackArtist
