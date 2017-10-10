@@ -422,13 +422,18 @@ viewHeader order =
                         NoOp
             in
                 button
-                    [ disabled isDisabled
+                    [ class "btn"
+                    , disabled isDisabled
                     , onClick onClickAction
                     ]
-                    [ text btnText ]
+                    [ div [ class "h4 bold" ] [ text btnText ] ]
     in
-        div []
-            ((h3 [] [ text "Sort By" ]) :: (List.map viewButton buttons))
+        div [ class "flex flex-wrap m2 pb1 border-bottom" ]
+            [ div [ class "col col-3" ]
+                [ div [ class "h2 bold pb1" ] [ text "Sort By" ]
+                , div [ class "btn-group" ] (List.map viewButton buttons)
+                ]
+            ]
 
 
 viewAlbumSection : Dict String (List BasicAlbum) -> String -> Html Msg
