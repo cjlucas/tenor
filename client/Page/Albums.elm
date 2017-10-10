@@ -12,8 +12,6 @@ import List.Extra
 import InfiniteScroll as IS
 import Utils
 import Date exposing (Date)
-import Dom.Scroll
-import Dom
 import Dict exposing (Dict)
 import Set
 import View.AlbumTracklist
@@ -203,7 +201,6 @@ type Msg
     | SelectedTrack String
     | DismissModal
     | InfiniteScrollMsg IS.Msg
-    | NoopScroll (Result Dom.Error ())
 
 
 loadAlbumsTask : Order -> Int -> Maybe String -> Task GraphQL.Client.Http.Error (Api.Connection BasicAlbum)
@@ -259,11 +256,8 @@ update msg model =
                     { model | albums = Dict.empty, sortOrder = order, infiniteScroll = is }
 
                 cmd =
-                    Cmd.batch
-                        [ loadAlbumsTask order 50 Nothing
-                            |> Task.attempt FetchedAlbums
-                        , Dom.Scroll.toY "viewport" 0 |> Task.attempt NoopScroll
-                        ]
+                    loadAlbumsTask order 50 Nothing
+                        |> Task.attempt FetchedAlbums
             in
                 ( model_, cmd, Nothing )
 
@@ -324,9 +318,6 @@ update msg model =
                 ( { model | infiniteScroll = is }, cmd, Nothing )
 
         NoOp ->
-            ( model, Cmd.none, Nothing )
-
-        NoopScroll _ ->
             ( model, Cmd.none, Nothing )
 
 
