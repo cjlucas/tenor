@@ -119,6 +119,7 @@ html, body {
   right: 0;
   background-color: rgba(0, 0, 0, .6);
   text-align: center;
+  z-index: 999;
 }
 
 .modal-content {
@@ -147,4 +148,16 @@ html, body {
 
 .track-list-row .track-content {
   border-top: 1px solid rgba(151, 151, 151, .25);
+}
+
+/* Ensure div containing image is square */
+.box {
+  position: relative;
+  padding-bottom: 100%;
+}
+
+/* Take image out of normal flow, allowing .box to essentially flow underneath the image */
+.box > img {
+  position: absolute;
+  width: 100%;
 }
