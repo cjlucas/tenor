@@ -21,6 +21,7 @@ html, body {
   overflow: hidden;
   /*background-color: pink;*/
   font-family: 'AvenirNext';
+  color: #4A4A4A;
 }
 
 .logo::first-letter {
