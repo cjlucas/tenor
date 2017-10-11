@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background: #FFFFFF;">
+    <!-- Generator: Sketch 46.2 (44496) - http://www.bohemiancoding.com/sketch -->
+    <title>Untitled</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#C8C8C8" stop-opacity="0.25" offset="0%"></stop>
+            <stop stop-color="#979797" stop-opacity="0.25" offset="100%"></stop>
+        </linearGradient>
+        <rect id="path-2" x="0" y="0" width="200" height="200"></rect>
+        <linearGradient x1="50%" y1="100%" x2="50%" y2="0%" id="linearGradient-3">
+            <stop stop-color="#979797" offset="0%"></stop>
+            <stop stop-color="#C8C8C8" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group">
+            <g id="Rectangle-4">
+                <use fill="url(#linearGradient-1)" fill-rule="evenodd" xlink:href="#path-2"></use>
+                <rect stroke="#979797" stroke-width="1" x="0.5" y="0.5" width="199" height="199"></rect>
+            </g>
+            <g id="music_1_" transform="translate(47.000000, 46.000000)" fill-rule="nonzero" fill="url(#linearGradient-3)">
+                <path d="M90,1.69903587 L90,3.90359418 L90,18.8240448 L90,76.6540184 L89.9623546,76.6540184 C89.7143381,82.2822558 84.3376937,88.1221307 76.4720261,90.6617819 C67.1470468,93.671004 57.8840717,90.8932605 55.7870032,84.4581548 C53.6943636,78.0230491 59.5515401,70.362209 68.8831626,67.3485778 C73.2256666,65.9486832 77.5438119,65.8164097 81.1400518,66.7092559 L81.1400518,23.4910948 L34.6369494,36.4274429 L34.6369494,92.0859266 L34.599304,92.0859266 C34.3512875,97.7141639 28.974643,103.554039 21.1089754,106.09369 C11.7839962,109.102912 2.52102108,106.325169 0.423952607,99.890063 C-1.668687,93.4549573 4.18848947,85.7941171 13.520112,82.7804859 C17.862616,81.3805914 22.1807612,81.2483179 25.7770011,82.141164 L25.7770011,36.6875808 L25.7770011,19.3355023 L25.7770011,19.1591377 C25.7770011,17.9444261 26.7380653,16.6922369 27.9139294,16.372576 L87.8586429,0.074276397 C89.0389359,-0.24318 90,0.486528801 90,1.69903587 Z" id="music"></path>
+            </g>
+        </g>
+    </g>
+</svg>

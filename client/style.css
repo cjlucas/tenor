@@ -73,7 +73,7 @@ html, body {
 }
 
 .album img {
-  max-width: 300px;
+  width: 300px;
 }
 
 .pointer {

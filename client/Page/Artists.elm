@@ -199,7 +199,7 @@ viewAlbums model =
                     img [ class "fit", src ("http://localhost:4000/image/" ++ id) ] []
 
                 Nothing ->
-                    text ""
+                    img [ class "fit", src "http://localhost:8000/missing_artwork.svg" ] []
 
         viewAlbum album =
             ( album.id

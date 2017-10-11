@@ -325,23 +325,23 @@ update msg model =
 -- View
 
 
-albumUrl id =
-    "http://localhost:4000/image/" ++ id
+albumUrl album =
+    case album.imageId of
+        Just id ->
+            "http://localhost:4000/image/" ++ id
+
+        Nothing ->
+            "http://localhost:8000/missing_artwork.svg"
 
 
 viewAlbum album =
     let
         albumImg =
-            case album.imageId of
-                Just id ->
-                    img
-                        [ style [ ( "width", "100%" ) ]
-                        , src (albumUrl id)
-                        ]
-                        []
-
-                Nothing ->
-                    text ""
+            img
+                [ style [ ( "width", "100%" ) ]
+                , src (albumUrl album)
+                ]
+                []
     in
         div [ class "col sm-col-6 md-col-3 lg-col-2 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
             [ div [ class "box" ] [ albumImg ]
@@ -358,18 +358,13 @@ viewModal : Maybe Album -> Html Msg
 viewModal album =
     let
         albumImg album =
-            case album.imageId of
-                Just id ->
-                    img [ class "fit pr2", src (albumUrl id) ] []
-
-                Nothing ->
-                    text ""
+            img [ class "fit pr2", src (albumUrl album) ] []
 
         viewContent =
             case album of
                 Just album ->
                     div [ class "modal-content p3", onClickStopProp NoOp ]
-                        [ div [ class "flex pb2" ]
+                        [ div [ class "pb2" ]
                             [ albumImg album
                             , div [ class "flex-auto" ]
                                 [ div [ class "h1 pb1" ]
