@@ -13,6 +13,8 @@ import Utils
 import View.AlbumTracklist
 import Dom
 import Dom.Scroll
+import Date exposing (Date)
+import Date.Extra
 
 
 -- Model
@@ -39,6 +41,7 @@ type alias Album =
     { id : String
     , name : String
     , imageId : Maybe String
+    , releaseDate : Maybe Date
     , discs : List Disc
     }
 
@@ -124,6 +127,24 @@ update msg model =
                 fromArtist f =
                     GraphQL.field "artist" [] (GraphQL.extract f)
 
+                parseMaybeDateStr maybeStr =
+                    let
+                        parseDateStr s =
+                            case Date.fromString s of
+                                Ok d ->
+                                    Just d
+
+                                Err err ->
+                                    Nothing
+                    in
+                        maybeStr |> Maybe.andThen parseDateStr
+
+                dateField name attrs =
+                    GraphQL.field
+                        name
+                        attrs
+                        (GraphQL.map parseMaybeDateStr (GraphQL.nullable GraphQL.string))
+
                 trackSpec =
                     GraphQL.object Track
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
@@ -144,6 +165,7 @@ update msg model =
                         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
                         |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
                         |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+                        |> GraphQL.with (dateField "releaseDate" [])
                         |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
 
                 artistSpec =
@@ -201,12 +223,36 @@ viewAlbums model =
                 Nothing ->
                     img [ class "fit", src "http://localhost:8000/missing_artwork.svg" ] []
 
+        albumDuration : Album -> String
+        albumDuration album =
+            album.discs
+                |> List.concatMap .tracks
+                |> List.map (round << .duration)
+                |> List.sum
+                |> Utils.durationHumanText
+
+        albumInfo album =
+            let
+                maybeReleaseDate =
+                    album.releaseDate
+                        |> Maybe.map (Date.Extra.toFormattedString "MMMM d, y")
+            in
+                [ Just (albumDuration album)
+                , maybeReleaseDate
+                ]
+                    |> List.filter (\x -> x /= Nothing)
+                    |> List.map (Maybe.withDefault "")
+                    |> String.join " · "
+
         viewAlbum album =
             ( album.id
             , div [ class "flex pb4 album" ]
                 [ div [ class "pr3" ] [ albumImage album ]
                 , div [ class "flex-auto" ]
-                    [ div [ class "h2 bold pb2" ] [ text album.name ]
+                    [ div [ class "border-bottom" ]
+                        [ div [ class "h2 bold" ] [ text album.name ]
+                        , div [ class "h5 pb1 dim" ] [ text (albumInfo album) ]
+                        ]
                     , View.AlbumTracklist.view (SelectedTrack album.id) album
                     ]
                 ]

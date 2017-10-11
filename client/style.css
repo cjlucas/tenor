@@ -198,3 +198,7 @@ html, body {
 .btn:first-child {
   margin-left: 0;
 }
+
+.dim {
+  color: rgba(74, 74, 74, .7);
+}
