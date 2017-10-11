@@ -1,4 +1,6 @@
-class Player {
+import Howler from 'howler';
+
+export default class Player {
   constructor(eventHandler) {
     this.eventHandler = eventHandler;
     this.currentID = null;
@@ -9,8 +11,7 @@ class Player {
         this.eventHandler({
           type: 'seek',
           time: this.player.seek()
-        });
-      }
+        }); }
     }, 300);
   }
 
@@ -58,7 +59,7 @@ class Player {
   }
 
   _registerPlayer(id, url) {
-    const player = new Howl({
+    const player = new Howler.Howl({
       src: [url],
       format: ['mp3'],
       autoplay: false,

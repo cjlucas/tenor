@@ -1,5 +1,10 @@
+import Player from './player';
+import Elm from './Main';
+
 const app = Elm.Main.fullscreen();
+
 const player = new Player(app.ports.playerEvent.send);
+
 window.player = player;
 
 app.ports.play_.subscribe(() => {
@@ -31,3 +36,4 @@ app.ports.reset_.subscribe(() => {
     type: 'reset'
   });
 });
+
