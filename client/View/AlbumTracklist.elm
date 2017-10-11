@@ -73,12 +73,12 @@ view chooseTrackMsg album =
 
         discHeader disc =
             if List.length album.discs > 1 then
-                div [ class "h3 bold" ] [ text (discName disc) ]
+                div [ class "h3 bold pb1" ] [ text (discName disc) ]
             else
                 text ""
 
         viewDisc disc =
-            div [ class "pb1" ]
+            div [ class "pt1" ]
                 [ discHeader disc
                 , viewTracks chooseTrackMsg showTrackArtists disc.tracks
                 ]
