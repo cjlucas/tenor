@@ -213,7 +213,7 @@ update msg model =
 -- View
 
 
-viewAlbums model =
+viewAlbum album =
     let
         albumImage album =
             case album.imageId of
@@ -243,30 +243,31 @@ viewAlbums model =
                     |> List.filter (\x -> x /= Nothing)
                     |> List.map (Maybe.withDefault "")
                     |> String.join " · "
-
-        viewAlbum album =
-            ( album.id
-            , div [ class "flex pb4 album" ]
-                [ div [ class "pr3" ] [ albumImage album ]
-                , div [ class "flex-auto" ]
-                    [ div [ class "border-bottom" ]
-                        [ div [ class "h2 bold" ] [ text album.name ]
-                        , div [ class "h5 pb1 dim" ] [ text (albumInfo album) ]
-                        ]
-                    , View.AlbumTracklist.view (SelectedTrack album.id) album
-                    ]
-                ]
-            )
     in
-        case model.selectedArtist of
-            Just artist ->
-                div []
-                    [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
-                    , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
+        ( album.id
+        , div [ class "flex pb4 album" ]
+            [ div [ class "pr3" ] [ albumImage album ]
+            , div [ class "flex-auto" ]
+                [ div [ class "border-bottom" ]
+                    [ div [ class "h2 bold" ] [ text album.name ]
+                    , div [ class "h5 pb1 dim" ] [ text (albumInfo album) ]
                     ]
+                , View.AlbumTracklist.view (SelectedTrack album.id) album
+                ]
+            ]
+        )
 
-            Nothing ->
-                text ""
+
+viewAlbums model =
+    case model.selectedArtist of
+        Just artist ->
+            div []
+                [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
+                , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
+                ]
+
+        Nothing ->
+            text ""
 
 
 viewArtist artist =
