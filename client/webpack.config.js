@@ -60,7 +60,9 @@ module.exports = {
         flatten: true,
       }
     ]),
-    new HtmlWebpackPlugin(),
+    new HtmlWebpackPlugin({
+      template: 'index.ejs',
+    }),
   ],
   output: {
     filename: 'app.js',
