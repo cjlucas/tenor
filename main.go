@@ -28,6 +28,12 @@ func main() {
 	router := gin.Default()
 	router.Use(cors.Default())
 
+	router.StaticFile("/", "dist/index.html")
+	router.StaticFile("/app.js", "dist/app.js")
+	router.StaticFile("/app.css", "dist/app.css")
+
+	router.Static("/static", "dist/static")
+
 	router.POST("/graphql", gin.WrapF(schema.HandleFunc))
 
 	router.GET("/image/:id", func(c *gin.Context) {

@@ -1,5 +1,6 @@
 import Player from './player';
 import Elm from './Main';
+import css from './app.scss';
 
 const app = Elm.Main.fullscreen();
 

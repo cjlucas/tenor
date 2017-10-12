@@ -328,10 +328,10 @@ update msg model =
 albumUrl album =
     case album.imageId of
         Just id ->
-            "http://localhost:4000/image/" ++ id
+            "/image/" ++ id
 
         Nothing ->
-            "http://localhost:8000/missing_artwork.svg"
+            "/static/images/missing_artwork.svg"
 
 
 viewAlbum album =

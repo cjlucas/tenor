@@ -17,7 +17,7 @@ import Route exposing (Route)
 
 
 streamUrl id =
-    "http://localhost:4000/stream/" ++ id
+    "/stream/" ++ id
 
 
 main =

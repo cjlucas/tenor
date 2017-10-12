@@ -1,16 +1,21 @@
+$fa-font-path: "~font-awesome/fonts";
+
+@import '~basscss/css/basscss.css';
+//@import '~font-awesome/scss/font-awesome.scss';
+
 @font-face {
   font-family: 'AvenirNext';
-  src: url('fonts/AvenirNext-Regular.ttf');
+  src: url('assets/fonts/AvenirNext-Regular.ttf');
 }
 
 @font-face {
   font-family: 'AvenirNextBold';
-  src: url('fonts/AvenirNext-Bold.ttf');
+  src: url('assets/fonts/AvenirNext-Bold.ttf');
 }
 
 @font-face {
   font-family: 'Lobster';
-  src: url('fonts/Lobster_1.3.otf');
+  src: url('assets/fonts/Lobster_1.3.otf');
 }
 
 /* Prevent full screen rubber-banding.
