@@ -292,7 +292,7 @@ viewArtist artist =
             , onClick (SelectedArtist artist.id)
             ]
             [ div
-                [ class "h3 bold pb1 pt2"
+                [ class "h3 bold pl2 pb1 pt2"
                 ]
                 [ text artist.name ]
             , div [ class "h5 pb1" ] [ text artistInfo ]
