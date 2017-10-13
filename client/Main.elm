@@ -561,7 +561,7 @@ viewNowPlaying player =
                     image =
                         case track.imageId of
                             Just id ->
-                                img [ class "pr1", src ("http://localhost:4000/image/" ++ id) ] []
+                                img [ class "pr1", src ("/image/" ++ id) ] []
 
                             Nothing ->
                                 text ""

@@ -30,7 +30,7 @@ connectionSpec nodeName spec =
 
 
 endpointUrl =
-    "http://localhost:4000/graphql"
+    "/graphql"
 
 
 type alias RequestSpec result vars =
