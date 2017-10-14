@@ -330,6 +330,13 @@ update msg model =
                 cmd =
                     IS.cmdFromScrollEvent InfiniteScrollMsg value
             in
+                {--
+                  IMPORTANT: The Json.Decode.Value cannot be logged due
+                  to cyclical references within the value.
+
+                  Issues with toString are being tracked here:
+                  https://github.com/elm-lang/core/issues/723
+                  --}
                 case Json.Decode.decodeValue Utils.onScrollDecoder value of
                     Ok pos ->
                         ( { model | albumsYPos = pos }, cmd, Nothing )
