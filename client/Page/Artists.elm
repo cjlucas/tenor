@@ -173,9 +173,12 @@ willAppear model =
             in
                 { model | artists = artists }
     in
-        (Api.getAlbumArtists spec)
-            |> Api.sendRequest
-            |> Task.andThen (handleArtistConnection >> Task.succeed)
+        if List.length model.artists > 0 then
+            Task.succeed model
+        else
+            (Api.getAlbumArtists spec)
+                |> Api.sendRequest
+                |> Task.andThen (handleArtistConnection >> Task.succeed)
 
 
 didAppear : Model -> ( Model, Cmd Msg )
@@ -213,7 +216,7 @@ type Msg
 
 
 update msg model =
-    case Debug.log "omg" msg of
+    case msg of
         SelectedArtist id ->
             let
                 cmd =
