@@ -60,6 +60,17 @@ type alias Artist =
     }
 
 
+sortAlbums : Artist -> Artist
+sortAlbums artist =
+    let
+        releaseDate album =
+            album.releaseDate
+                |> Maybe.withDefault (Date.fromTime 0)
+                |> Date.toTime
+    in
+        { artist | albums = List.sortBy releaseDate artist.albums }
+
+
 findAlbum : String -> Artist -> Maybe Album
 findAlbum id artist =
     artist.albums |> List.filter (\album -> album.id == id) |> List.head
@@ -184,8 +195,13 @@ update msg model =
             let
                 cmd =
                     Dom.Scroll.toY "albums" 0 |> Task.attempt NoopScroll
+
+                justArtist =
+                    artist
+                        |> sortAlbums
+                        |> Just
             in
-                ( { model | selectedArtist = Just artist }, cmd, Nothing )
+                ( { model | selectedArtist = justArtist }, cmd, Nothing )
 
         SelectedTrack albumId trackId ->
             let
