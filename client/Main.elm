@@ -161,7 +161,7 @@ type Page
 
 type PageState
     = PageLoading
-    | PageLoaded
+    | PageLoaded -- Name conflict with BufferingState. If/when Player is refacted out, rename this
 
 
 type alias Model =
