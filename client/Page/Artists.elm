@@ -30,11 +30,32 @@ type alias Track =
     }
 
 
+trackSpec =
+    let
+        fromArtist f =
+            GraphQL.field "artist" [] (GraphQL.extract f)
+    in
+        GraphQL.object Track
+            |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+            |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+            |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
+            |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+            |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+
+
 type alias Disc =
     { name : Maybe String
     , position : Int
     , tracks : List Track
     }
+
+
+discSpec =
+    GraphQL.object Disc
+        |> GraphQL.with (GraphQL.field "name" [] (GraphQL.nullable GraphQL.string))
+        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+        |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
 
 
 type alias Album =
@@ -46,6 +67,34 @@ type alias Album =
     }
 
 
+albumSpec =
+    let
+        parseMaybeDateStr maybeStr =
+            let
+                parseDateStr s =
+                    case Date.fromString s of
+                        Ok d ->
+                            Just d
+
+                        Err err ->
+                            Nothing
+            in
+                maybeStr |> Maybe.andThen parseDateStr
+
+        dateField name attrs =
+            GraphQL.field
+                name
+                attrs
+                (GraphQL.map parseMaybeDateStr (GraphQL.nullable GraphQL.string))
+    in
+        GraphQL.object Album
+            |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+            |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+            |> GraphQL.with (dateField "releaseDate" [])
+            |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
+
+
 type alias SidebarArtist =
     { id : String
     , name : String
@@ -54,10 +103,24 @@ type alias SidebarArtist =
     }
 
 
+sidebarSpec =
+    GraphQL.object SidebarArtist
+        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (GraphQL.field "albumCount" [] GraphQL.int)
+        |> GraphQL.with (GraphQL.field "trackCount" [] GraphQL.int)
+
+
 type alias Artist =
     { name : String
     , albums : List Album
     }
+
+
+artistSpec =
+    GraphQL.object Artist
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (GraphQL.field "albums" [] (GraphQL.list albumSpec))
 
 
 sortAlbums : Artist -> Artist
@@ -90,13 +153,7 @@ init : ( Model, Task GraphQL.Client.Http.Error Model )
 init =
     let
         spec =
-            Api.connectionSpec "artist"
-                (GraphQL.object SidebarArtist
-                    |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                    |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                    |> GraphQL.with (GraphQL.field "albumCount" [] GraphQL.int)
-                    |> GraphQL.with (GraphQL.field "trackCount" [] GraphQL.int)
-                )
+            Api.connectionSpec "artist" sidebarSpec
 
         task =
             (Api.getAlbumArtists spec)
@@ -135,55 +192,6 @@ update msg model =
     case Debug.log "omg" msg of
         SelectedArtist id ->
             let
-                fromArtist f =
-                    GraphQL.field "artist" [] (GraphQL.extract f)
-
-                parseMaybeDateStr maybeStr =
-                    let
-                        parseDateStr s =
-                            case Date.fromString s of
-                                Ok d ->
-                                    Just d
-
-                                Err err ->
-                                    Nothing
-                    in
-                        maybeStr |> Maybe.andThen parseDateStr
-
-                dateField name attrs =
-                    GraphQL.field
-                        name
-                        attrs
-                        (GraphQL.map parseMaybeDateStr (GraphQL.nullable GraphQL.string))
-
-                trackSpec =
-                    GraphQL.object Track
-                        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
-                        |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
-                        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                        |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
-                        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
-
-                discSpec =
-                    GraphQL.object Disc
-                        |> GraphQL.with (GraphQL.field "name" [] (GraphQL.nullable GraphQL.string))
-                        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
-                        |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
-
-                albumSpec =
-                    GraphQL.object Album
-                        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
-                        |> GraphQL.with (dateField "releaseDate" [])
-                        |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
-
-                artistSpec =
-                    GraphQL.object Artist
-                        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                        |> GraphQL.with (GraphQL.field "albums" [] (GraphQL.list albumSpec))
-
                 cmd =
                     (Api.getArtist id artistSpec)
                         |> Api.sendRequest

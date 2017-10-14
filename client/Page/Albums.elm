@@ -20,6 +20,10 @@ import View.AlbumTracklist
 -- Model
 
 
+fromArtist f =
+    GraphQL.field "artist" [] (GraphQL.extract f)
+
+
 type alias BasicAlbum =
     { id : String
     , name : String
@@ -30,21 +34,14 @@ type alias BasicAlbum =
     }
 
 
-type alias Disc =
-    { name : Maybe String
-    , position : Int
-    , tracks : List Track
-    }
-
-
-type alias Track =
-    { id : String
-    , position : Int
-    , duration : Float
-    , name : String
-    , artistName : String
-    , imageId : Maybe String
-    }
+basicAlbumSpec =
+    GraphQL.object BasicAlbum
+        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
+        |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+        |> GraphQL.with (dateField "createdAt" [])
+        |> GraphQL.with (dateField "releaseDate" [])
 
 
 type alias Album =
@@ -67,32 +64,47 @@ dateField name attrs =
 
 
 albumSpec =
-    let
-        fromArtist f =
-            GraphQL.field "artist" [] (GraphQL.extract f)
+    GraphQL.object Album
+        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
+        |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+        |> GraphQL.with (dateField "createdAt" [])
+        |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
 
-        trackSpec =
-            GraphQL.object Track
-                |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
-                |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
-                |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
-                |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
 
-        discSpec =
-            GraphQL.object Disc
-                |> GraphQL.with (GraphQL.field "name" [] (GraphQL.nullable GraphQL.string))
-                |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
-                |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
-    in
-        GraphQL.object Album
-            |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-            |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
-            |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
-            |> GraphQL.with (dateField "createdAt" [])
-            |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
+type alias Disc =
+    { name : Maybe String
+    , position : Int
+    , tracks : List Track
+    }
+
+
+discSpec =
+    GraphQL.object Disc
+        |> GraphQL.with (GraphQL.field "name" [] (GraphQL.nullable GraphQL.string))
+        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+        |> GraphQL.with (GraphQL.field "tracks" [] (GraphQL.list trackSpec))
+
+
+type alias Track =
+    { id : String
+    , position : Int
+    , duration : Float
+    , name : String
+    , artistName : String
+    , imageId : Maybe String
+    }
+
+
+trackSpec =
+    GraphQL.object Track
+        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+        |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
 
 
 type Order
@@ -206,20 +218,8 @@ type Msg
 loadAlbumsTask : Order -> Int -> Maybe String -> Task GraphQL.Client.Http.Error (Api.Connection BasicAlbum)
 loadAlbumsTask order limit maybeCursor =
     let
-        fromArtist f =
-            GraphQL.field "artist" [] (GraphQL.extract f)
-
-        albumSpec =
-            GraphQL.object BasicAlbum
-                |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-                |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-                |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
-                |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
-                |> GraphQL.with (dateField "createdAt" [])
-                |> GraphQL.with (dateField "releaseDate" [])
-
         connectionSpec =
-            Api.connectionSpec "album" albumSpec
+            Api.connectionSpec "album" basicAlbumSpec
 
         ( orderBy, desc ) =
             case order of
