@@ -155,8 +155,7 @@ type alias Track =
 
 
 type Page
-    = Blank
-    | Artists Page.Artists.Model
+    = Artists Page.Artists.Model
     | Albums Page.Albums.Model
 
 
@@ -168,26 +167,20 @@ type PageState
 type alias Model =
     { player : Player
     , pageState : PageState
-    , currentPage : Page
+    , currentRoute : Route
     , artistsPageState : Page.Artists.Model
     , albumsPageState : Page.Albums.Model
     }
 
 
-persistCurrentPage model =
-    case model.currentPage of
+setPageState : Page -> Model -> Model
+setPageState page model =
+    case page of
         Artists pageModel ->
             { model | artistsPageState = pageModel }
 
         Albums pageModel ->
             { model | albumsPageState = pageModel }
-
-        Blank ->
-            model
-
-
-setPageState state model =
-    { model | pageState = state }
 
 
 
@@ -199,7 +192,7 @@ init =
         model =
             { player = defaultPlayer
             , pageState = PageLoaded
-            , currentPage = Blank
+            , currentRoute = Route.Artists
             , artistsPageState = Page.Artists.init
             , albumsPageState = Page.Albums.init
             }
@@ -244,33 +237,17 @@ update msg model =
             loadPage route model
 
         ShowPage (Ok page) ->
-            ( { model
-                | pageState = PageLoaded
-                , currentPage = page
-              }
-            , Cmd.none
-            )
+            let
+                model_ =
+                    { model | pageState = PageLoaded }
+            in
+                ( setPageState page model_, Cmd.none )
 
         ShowPage (Err err) ->
             ( model, Cmd.none )
 
         PageMsg msg ->
-            let
-                ( model_, cmd ) =
-                    updatePage msg model
-
-                currentPage =
-                    case model_.currentPage of
-                        Artists _ ->
-                            Artists model.artistsPageState
-
-                        Albums _ ->
-                            Albums model.albumsPageState
-
-                        Blank ->
-                            Blank
-            in
-                ( { model_ | currentPage = currentPage }, cmd )
+            updatePage msg model
 
         PlayerEvent event ->
             let
@@ -323,25 +300,21 @@ resetPlayerWithTracks tracks model =
 loadPage : Route -> Model -> ( Model, Cmd Msg )
 loadPage route model =
     let
-        model_ =
-            model
-                |> persistCurrentPage
-                |> setPageState PageLoading
-
-        cmd =
+        task =
             case route of
                 Route.Artists ->
                     Page.Artists.willAppear model.artistsPageState
                         |> Task.map Artists
-                        |> Task.attempt ShowPage
 
                 Route.Albums ->
                     Page.Albums.willAppear model.albumsPageState
                         |> Maybe.withDefault (Task.succeed model.albumsPageState)
                         |> Task.map Albums
-                        |> Task.attempt ShowPage
+
+        cmd =
+            Task.attempt ShowPage task
     in
-        ( model_, cmd )
+        ( { model | currentRoute = route, pageState = PageLoading }, cmd )
 
 
 updatePage : PageMsg -> Model -> ( Model, Cmd Msg )
@@ -639,24 +612,17 @@ viewHeader player =
 
 
 viewPage model =
-    let
-        page =
-            case model.pageState of
-                PageLoading ->
-                    Blank
+    case model.pageState of
+        PageLoading ->
+            text ""
 
-                PageLoaded ->
-                    model.currentPage
-    in
-        case page of
-            Artists model ->
-                Html.map ArtistsMsg <| Page.Artists.view model
+        PageLoaded ->
+            case model.currentRoute of
+                Route.Artists ->
+                    Html.map ArtistsMsg <| Page.Artists.view model.artistsPageState
 
-            Albums model ->
-                Html.map AlbumsMsg <| Page.Albums.view model
-
-            Blank ->
-                text ""
+                Route.Albums ->
+                    Html.map AlbumsMsg <| Page.Albums.view model.albumsPageState
 
 
 view model =
