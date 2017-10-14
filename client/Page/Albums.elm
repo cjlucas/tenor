@@ -1,4 +1,4 @@
-module Page.Albums exposing (Model, Msg, OutMsg(..), init, update, view)
+module Page.Albums exposing (Model, Msg, OutMsg(..), init, willAppear, update, view)
 
 import GraphQL.Request.Builder as GraphQL
 import GraphQL.Client.Http
@@ -167,14 +167,16 @@ setAlbums albums model =
 
 
 init =
-    let
-        model =
-            { albums = Dict.empty
-            , sortOrder = AlbumName
-            , selectedAlbum = Nothing
-            , infiniteScroll = IS.init (loadAlbums AlbumName 50 Nothing) |> IS.offset 2000
-            }
+    { albums = Dict.empty
+    , sortOrder = AlbumName
+    , selectedAlbum = Nothing
+    , infiniteScroll = IS.init (loadAlbums AlbumName 50 Nothing) |> IS.offset 2000
+    }
 
+
+willAppear : Model -> Maybe (Task GraphQL.Client.Http.Error Model)
+willAppear model =
+    let
         task =
             loadAlbumsTask model.sortOrder 50 Nothing
                 |> Task.andThen
@@ -193,7 +195,10 @@ init =
                                 }
                     )
     in
-        ( model, task )
+        if Dict.size model.albums > 0 then
+            Nothing
+        else
+            Just task
 
 
 

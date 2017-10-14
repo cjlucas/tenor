@@ -1,4 +1,4 @@
-module Page.Artists exposing (Model, OutMsg(..), Msg, init, update, view)
+module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, update, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -149,28 +149,29 @@ type alias Model =
 -- Init
 
 
-init : ( Model, Task GraphQL.Client.Http.Error Model )
+init : Model
 init =
+    { artists = []
+    , selectedArtist = Nothing
+    }
+
+
+willAppear : Model -> Task GraphQL.Client.Http.Error Model
+willAppear model =
     let
         spec =
             Api.connectionSpec "artist" sidebarArtistSpec
 
-        task =
-            (Api.getAlbumArtists spec)
-                |> Api.sendRequest
-                |> Task.andThen
-                    (\connection ->
-                        let
-                            artists =
-                                List.map .node connection.edges
-                        in
-                            Task.succeed
-                                { artists = artists
-                                , selectedArtist = Nothing
-                                }
-                    )
+        handleArtistConnection connection =
+            let
+                artists =
+                    List.map .node connection.edges
+            in
+                { model | artists = artists }
     in
-        ( { artists = [], selectedArtist = Nothing }, task )
+        (Api.getAlbumArtists spec)
+            |> Api.sendRequest
+            |> Task.andThen (handleArtistConnection >> Task.succeed)
 
 
 
