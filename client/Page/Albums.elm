@@ -1,4 +1,4 @@
-module Page.Albums exposing (Model, Msg, OutMsg(..), init, willAppear, update, view)
+module Page.Albums exposing (Model, Msg, OutMsg(..), init, willAppear, didAppear, update, view)
 
 import GraphQL.Request.Builder as GraphQL
 import GraphQL.Client.Http
@@ -10,11 +10,14 @@ import Html.Events exposing (..)
 import Json.Decode
 import List.Extra
 import InfiniteScroll as IS
-import Utils
+import Utils exposing (onScroll)
 import Date exposing (Date)
 import Dict exposing (Dict)
 import Set
 import View.AlbumTracklist
+import Dom
+import Dom.Scroll
+import Json.Decode
 
 
 -- Model
@@ -117,6 +120,7 @@ type alias Model =
     { albums : Dict String (List BasicAlbum)
     , sortOrder : Order
     , selectedAlbum : Maybe Album
+    , albumsYPos : Float
     , infiniteScroll : IS.Model Msg
     }
 
@@ -170,6 +174,7 @@ init =
     { albums = Dict.empty
     , sortOrder = AlbumName
     , selectedAlbum = Nothing
+    , albumsYPos = 0
     , infiniteScroll = IS.init (loadAlbums AlbumName 50 Nothing) |> IS.offset 2000
     }
 
@@ -201,6 +206,15 @@ willAppear model =
             Just task
 
 
+didAppear model =
+    let
+        cmd =
+            Dom.Scroll.toY "viewport" model.albumsYPos
+                |> Task.attempt NoopScroll
+    in
+        ( model, cmd )
+
+
 
 -- Update
 
@@ -211,11 +225,13 @@ type OutMsg
 
 type Msg
     = NoOp
+    | NoopScroll (Result Dom.Error ())
     | NewSortOrder Order
     | FetchedAlbums (Result GraphQL.Client.Http.Error (Api.Connection BasicAlbum))
     | SelectedAlbum String
     | GotSelectedAlbum (Result GraphQL.Client.Http.Error Album)
     | SelectedTrack String
+    | AlbumsScroll Json.Decode.Value
     | DismissModal
     | InfiniteScrollMsg IS.Msg
 
@@ -249,7 +265,7 @@ loadAlbums order limit maybeCursor _ =
 
 update : Msg -> Model -> ( Model, Cmd Msg, Maybe OutMsg )
 update msg model =
-    case Debug.log "msg " msg of
+    case msg of
         NewSortOrder order ->
             let
                 is =
@@ -309,6 +325,18 @@ update msg model =
             in
                 ( { model | selectedAlbum = Nothing }, Cmd.none, outMsg )
 
+        AlbumsScroll value ->
+            let
+                cmd =
+                    IS.cmdFromScrollEvent InfiniteScrollMsg value
+            in
+                case Json.Decode.decodeValue Utils.onScrollDecoder value of
+                    Ok pos ->
+                        ( { model | albumsYPos = pos }, cmd, Nothing )
+
+                    Err err ->
+                        ( model, cmd, Nothing )
+
         DismissModal ->
             ( { model | selectedAlbum = Nothing }, Cmd.none, Nothing )
 
@@ -323,6 +351,9 @@ update msg model =
                 ( { model | infiniteScroll = is }, cmd, Nothing )
 
         NoOp ->
+            ( model, Cmd.none, Nothing )
+
+        NoopScroll _ ->
             ( model, Cmd.none, Nothing )
 
 
@@ -462,7 +493,7 @@ view model =
         , div
             [ class "main content mx-auto"
             , id "viewport"
-            , IS.infiniteScroll InfiniteScrollMsg
+            , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
             ]
             ((viewHeader model.sortOrder)
                 :: (viewAlbums model.albums)

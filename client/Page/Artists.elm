@@ -1,4 +1,4 @@
-module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, update, view)
+module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, didAppear, update, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -9,7 +9,7 @@ import GraphQL.Request.Builder as GraphQL
 import GraphQL.Client.Http
 import Task exposing (Task)
 import List.Extra
-import Utils
+import Utils exposing (onScroll)
 import View.AlbumTracklist
 import Dom
 import Dom.Scroll
@@ -141,6 +141,8 @@ findAlbum id artist =
 
 type alias Model =
     { artists : List SidebarArtist
+    , sidebarYPos : Float
+    , albumsYPos : Float
     , selectedArtist : Maybe Artist
     }
 
@@ -152,6 +154,8 @@ type alias Model =
 init : Model
 init =
     { artists = []
+    , sidebarYPos = 0
+    , albumsYPos = 0
     , selectedArtist = Nothing
     }
 
@@ -174,6 +178,23 @@ willAppear model =
             |> Task.andThen (handleArtistConnection >> Task.succeed)
 
 
+didAppear : Model -> ( Model, Cmd Msg )
+didAppear model =
+    let
+        scrollPositions =
+            [ ( "sidebar", model.sidebarYPos )
+            , ( "albums", model.albumsYPos )
+            ]
+
+        cmd =
+            scrollPositions
+                |> List.map (\( id, pos ) -> Dom.Scroll.toY id pos)
+                |> List.map (Task.attempt NoopScroll)
+                |> Cmd.batch
+    in
+        ( model, cmd )
+
+
 
 -- Update
 
@@ -186,6 +207,8 @@ type Msg
     = SelectedArtist String
     | GotArtist (Result GraphQL.Client.Http.Error Artist)
     | SelectedTrack String String
+    | SidebarScroll Float
+    | AlbumsScroll Float
     | NoopScroll (Result Dom.Error ())
 
 
@@ -229,6 +252,12 @@ update msg model =
                             []
             in
                 ( model, Cmd.none, Just (UpdatePlaylist tracks) )
+
+        SidebarScroll pos ->
+            ( { model | sidebarYPos = pos }, Cmd.none, Nothing )
+
+        AlbumsScroll pos ->
+            ( { model | albumsYPos = pos }, Cmd.none, Nothing )
 
         _ ->
             ( model, Cmd.none, Nothing )
@@ -326,7 +355,7 @@ viewArtist artist =
 
 view model =
     div [ class "main flex" ]
-        [ div [ class "sidebar pr3" ] (List.map viewArtist model.artists)
+        [ div [ id "sidebar", class "sidebar pr3", onScroll SidebarScroll ] (List.map viewArtist model.artists)
         , span [ class "divider mt2 mb2" ] []
-        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2" ] [ viewAlbums model ]
+        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2", onScroll AlbumsScroll ] [ viewAlbums model ]
         ]

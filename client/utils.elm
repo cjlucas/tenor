@@ -1,4 +1,8 @@
-module Utils exposing (durationText, durationHumanText)
+module Utils exposing (durationText, durationHumanText, onScroll, onScrollDecoder)
+
+import Html
+import Html.Events exposing (on)
+import Json.Decode
 
 
 type alias Duration =
@@ -66,3 +70,17 @@ durationText duration =
         components
             |> List.indexedMap componentToString
             |> String.join ":"
+
+
+onScrollDecoder : Json.Decode.Decoder Float
+onScrollDecoder =
+    (Json.Decode.at [ "target", "scrollTop" ] Json.Decode.float)
+
+
+onScroll : (Float -> msg) -> Html.Attribute msg
+onScroll msg =
+    let
+        decodeScrollPos =
+            Json.Decode.map msg onScrollDecoder
+    in
+        on "scroll" decodeScrollPos

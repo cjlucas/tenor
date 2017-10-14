@@ -237,11 +237,7 @@ update msg model =
             loadPage route model
 
         ShowPage (Ok page) ->
-            let
-                model_ =
-                    { model | pageState = PageLoaded }
-            in
-                ( setPageState page model_, Cmd.none )
+            showPage page model
 
         ShowPage (Err err) ->
             ( model, Cmd.none )
@@ -315,6 +311,36 @@ loadPage route model =
             Task.attempt ShowPage task
     in
         ( { model | currentRoute = route, pageState = PageLoading }, cmd )
+
+
+showPage : Page -> Model -> ( Model, Cmd Msg )
+showPage page model =
+    let
+        model_ =
+            { model | pageState = PageLoaded }
+
+        didAppear pageTag pageMsgTag didAppearFn pageModel =
+            let
+                ( pageModel_, cmd ) =
+                    didAppearFn pageModel
+
+                model__ =
+                    setPageState (pageTag pageModel_) model_
+            in
+                ( model__, cmd |> Cmd.map pageMsgTag |> Cmd.map PageMsg )
+    in
+        case page of
+            Artists pageModel ->
+                didAppear Artists
+                    ArtistsMsg
+                    Page.Artists.didAppear
+                    pageModel
+
+            Albums pageModel ->
+                didAppear Albums
+                    AlbumsMsg
+                    Page.Albums.didAppear
+                    pageModel
 
 
 updatePage : PageMsg -> Model -> ( Model, Cmd Msg )
