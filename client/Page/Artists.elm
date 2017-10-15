@@ -140,11 +140,16 @@ findAlbum id artist =
     artist.albums |> List.filter (\album -> album.id == id) |> List.head
 
 
+type SelectionMode
+    = AllArtists (List Artist)
+    | SingleArtist Artist
+
+
 type alias Model =
     { artists : List SidebarArtist
     , sidebarYPos : Float
     , albumsYPos : Float
-    , selectedArtists : List Artist
+    , selectionMode : SelectionMode
     , albumMap : Dict String Album
     }
 
@@ -158,7 +163,7 @@ init =
     { artists = []
     , sidebarYPos = 0
     , albumsYPos = 0
-    , selectedArtists = []
+    , selectionMode = AllArtists []
     , albumMap = Dict.empty
     }
 
@@ -212,6 +217,7 @@ type OutMsg
 type Msg
     = SelectedArtist String
     | GotArtist (Result GraphQL.Client.Http.Error Artist)
+    | SelectedAllArtists
     | SelectedTrack String String
     | SidebarScroll Float
     | AlbumsScroll Float
@@ -240,12 +246,15 @@ update msg model =
                         |> Dict.fromList
             in
                 ( { model
-                    | selectedArtists = [ sortAlbums artist ]
+                    | selectionMode = SingleArtist artist
                     , albumMap = albumMap
                   }
                 , cmd
                 , Nothing
                 )
+
+        SelectedAllArtists ->
+            ( { model | selectionMode = AllArtists [] }, Cmd.none, Nothing )
 
         SelectedTrack albumId trackId ->
             let
@@ -374,7 +383,7 @@ viewSidebar artists =
             div [ class "h3 bold pt2 pb2" ] [ text "All Artists" ]
 
         allArtistsEntry =
-            viewSidebarEntry allArtistsEntryContent (SelectedArtist "")
+            viewSidebarEntry allArtistsEntryContent SelectedAllArtists
 
         viewEntries =
             allArtistsEntry :: (List.map viewSidebarArtist artists)
@@ -387,9 +396,27 @@ viewSidebar artists =
             viewEntries
 
 
+viewMain model =
+    let
+        artists =
+            case model.selectionMode of
+                AllArtists artists ->
+                    artists
+
+                SingleArtist artist ->
+                    [ artist ]
+    in
+        div
+            [ id "albums"
+            , class "content flex-auto pl4 pr4 mb4 pt2"
+            , onScroll AlbumsScroll
+            ]
+            (List.map viewArtist artists)
+
+
 view model =
     div [ class "main flex" ]
         [ viewSidebar model.artists
         , span [ class "divider mt2 mb2" ] []
-        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2", onScroll AlbumsScroll ] (List.map viewArtist model.selectedArtists)
+        , viewMain model
         ]
