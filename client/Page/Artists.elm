@@ -330,6 +330,14 @@ viewArtist artist =
         ]
 
 
+viewSidebarEntry viewContent onClickMsg =
+    div
+        [ class "pointer right-align border-bottom"
+        , onClick onClickMsg
+        ]
+        [ viewContent ]
+
+
 viewSidebarArtist artist =
     let
         artistInfo =
@@ -346,21 +354,37 @@ viewSidebarArtist artist =
                   else
                     "tracks"
                 ]
-    in
-        div
-            [ class "pointer right-align border-bottom"
-            , onClick (SelectedArtist artist.id)
-            ]
-            [ div
-                [ class "h3 bold pl2 pb1 pt2"
+
+        viewContent =
+            div []
+                [ div
+                    [ class "h3 bold pl2 pb1 pt2" ]
+                    [ text artist.name ]
+                , div
+                    [ class "h5 pb1" ]
+                    [ text artistInfo ]
                 ]
-                [ text artist.name ]
-            , div [ class "h5 pb1" ] [ text artistInfo ]
-            ]
+    in
+        viewSidebarEntry viewContent (SelectedArtist artist.id)
 
 
 viewSidebar artists =
-    div [ id "sidebar", class "sidebar pr3", onScroll SidebarScroll ] (List.map viewSidebarArtist artists)
+    let
+        allArtistsEntryContent =
+            div [ class "h3 bold pt2 pb2" ] [ text "All Artists" ]
+
+        allArtistsEntry =
+            viewSidebarEntry allArtistsEntryContent (SelectedArtist "")
+
+        viewEntries =
+            allArtistsEntry :: (List.map viewSidebarArtist artists)
+    in
+        div
+            [ id "sidebar"
+            , class "sidebar pr3"
+            , onScroll SidebarScroll
+            ]
+            viewEntries
 
 
 view model =
