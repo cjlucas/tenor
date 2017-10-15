@@ -170,9 +170,12 @@ addSelectedArtists artists model =
             artists
                 |> List.concatMap .albums
                 |> List.foldl indexAlbum model.albumMap
+
+        artists_ =
+            List.map sortAlbums artists
     in
         { model
-            | selectedArtists = model.selectedArtists ++ artists
+            | selectedArtists = model.selectedArtists ++ artists_
             , albumMap = albumMap
         }
 
