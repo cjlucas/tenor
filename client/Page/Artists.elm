@@ -141,17 +141,13 @@ findAlbum id artist =
     artist.albums |> List.filter (\album -> album.id == id) |> List.head
 
 
-type SelectionMode
-    = AllArtists (IS.Model Msg) (List Artist)
-    | SingleArtist Artist
-
-
 type alias Model =
     { artists : List SidebarArtist
     , sidebarYPos : Float
     , albumsYPos : Float
-    , selectionMode : SelectionMode
+    , selectedArtists : List Artist
     , albumMap : Dict String Album
+    , infiniteScroll : IS.Model Msg
     }
 
 
@@ -164,13 +160,9 @@ type InitialResponses
     | SelectedArtists (Api.Connection Artist)
 
 
-initialAllArtistsSelection =
-    let
-        infiniteScroll =
-            IS.init (loadArtists Nothing)
-                |> IS.offset 2000
-    in
-        AllArtists infiniteScroll []
+defaultAllArtistsInfiniteScroll =
+    IS.init (loadArtists Nothing)
+        |> IS.offset 2000
 
 
 init : Model
@@ -178,8 +170,9 @@ init =
     { artists = []
     , sidebarYPos = 0
     , albumsYPos = 0
-    , selectionMode = initialAllArtistsSelection
+    , selectedArtists = []
     , albumMap = Dict.empty
+    , infiniteScroll = defaultAllArtistsInfiniteScroll
     }
 
 
@@ -272,8 +265,11 @@ update msg model =
                     (Api.getArtist id artistSpec)
                         |> Api.sendRequest
                         |> Task.attempt GotArtist
+
+                infiniteScroll =
+                    IS.init noopLoadMore
             in
-                ( model, cmd, Nothing )
+                ( { model | infiniteScroll = infiniteScroll }, cmd, Nothing )
 
         GotArtist (Ok artist) ->
             let
@@ -286,7 +282,7 @@ update msg model =
                         |> Dict.fromList
             in
                 ( { model
-                    | selectionMode = SingleArtist artist
+                    | selectedArtists = [ artist ]
                     , albumMap = albumMap
                   }
                 , cmd
@@ -295,7 +291,9 @@ update msg model =
 
         SelectedAllArtists ->
             ( { model
-                | selectionMode = initialAllArtistsSelection
+                | selectedArtists = []
+                , infiniteScroll = defaultAllArtistsInfiniteScroll
+                , albumMap = Dict.empty
               }
             , loadArtistsTask Nothing |> Task.attempt GotArtists
             , Nothing
@@ -329,20 +327,10 @@ update msg model =
 
         InfiniteScrollMsg msg ->
             let
-                ( selectionMode, cmd ) =
-                    case model.selectionMode of
-                        AllArtists infiniteScroll artists ->
-                            let
-                                ( is, cmd ) =
-                                    IS.update InfiniteScrollMsg msg infiniteScroll
-                            in
-                                ( AllArtists is artists, cmd )
-
-                        -- TODO: BADDDDDDD
-                        other ->
-                            ( other, Cmd.none )
+                ( infiniteScroll, cmd ) =
+                    IS.update InfiniteScrollMsg msg model.infiniteScroll
             in
-                ( { model | selectionMode = selectionMode }, cmd, Nothing )
+                ( { model | infiniteScroll = infiniteScroll }, cmd, Nothing )
 
         -- TODO: Remove me
         _ ->
@@ -364,24 +352,32 @@ loadArtists maybeCursor direction =
     loadArtistsTask maybeCursor |> Task.attempt GotArtists
 
 
+noopLoadMore direction =
+    Cmd.none
+
+
 handleLoadArtistsResponse connection model =
     let
         newArtists =
             List.map .node connection.edges
 
-        ( infiniteScroll, artists ) =
-            case model.selectionMode of
-                AllArtists infiniteScroll artists ->
-                    ( infiniteScroll, artists ++ newArtists )
+        indexAlbum album dict =
+            Dict.insert album.id album dict
 
-                _ ->
-                    Debug.crash "THIS SHOULD NEVER HAPPEN"
+        albumMap =
+            newArtists
+                |> List.concatMap .albums
+                |> List.foldl indexAlbum model.albumMap
 
-        infiniteScroll_ =
-            infiniteScroll
+        infiniteScroll =
+            model.infiniteScroll
                 |> IS.loadMoreCmd (loadArtists (Just connection.endCursor))
     in
-        { model | selectionMode = AllArtists infiniteScroll_ artists }
+        { model
+            | selectedArtists = model.selectedArtists ++ newArtists
+            , infiniteScroll = infiniteScroll
+            , albumMap = albumMap
+        }
 
 
 
@@ -499,25 +495,15 @@ viewSidebar artists =
 
 viewMain model =
     let
-        ( attrs, artists ) =
-            case model.selectionMode of
-                AllArtists infiniteScroll artists ->
-                    let
-                        attr =
-                            IS.infiniteScroll InfiniteScrollMsg
-                    in
-                        ( [ attr ], artists )
-
-                SingleArtist artist ->
-                    ( [], [ artist ] )
+        artists =
+            model.selectedArtists
     in
         div
-            ([ id "albums"
-             , class "content flex-auto pl4 pr4 mb4 pt2"
-             , onScroll AlbumsScroll
-             ]
-                ++ attrs
-            )
+            [ id "albums"
+            , class "content flex-auto pl4 pr4 mb4 pt2"
+            , onScroll AlbumsScroll
+            , IS.infiniteScroll InfiniteScrollMsg
+            ]
             (List.map viewArtist artists)
 
 
