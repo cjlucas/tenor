@@ -378,7 +378,7 @@ update msg model =
 loadArtistsTask maybeCursor =
     let
         limit =
-            20
+            10
 
         spec =
             Api.connectionSpec "artist" artistSpec
