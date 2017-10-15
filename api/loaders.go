@@ -10,16 +10,33 @@ import (
 	"github.com/nicksrandall/dataloader"
 )
 
+func uniqueKeys(keys []string) []string {
+	m := make(map[string]bool)
+
+	for _, k := range keys {
+		m[k] = true
+	}
+
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+
+	return out
+}
+
 func NewHasManyAssocLoader(
 	coll *db.Collection,
 	assocType interface{},
 	fkField string,
 	fieldName string) *dataloader.Loader {
 	fn := func(ctx context.Context, keys []string) []*dataloader.Result {
+		uniqueKeys := uniqueKeys(keys)
+
 		ptr := reflect.New(reflect.SliceOf(reflect.TypeOf(assocType)))
 		res := reflect.Indirect(ptr)
 		coll.
-			Where(fmt.Sprintf("%s in (?)", fkField), keys).
+			Where(fmt.Sprintf("%s in (?)", fkField), uniqueKeys).
 			All(ptr.Interface())
 
 		mapType := reflect.MapOf(reflect.TypeOf(""), res.Type())
@@ -61,12 +78,14 @@ func NewHasManyAssocLoader(
 
 func NewBelongsToAssocLoader(coll *db.Collection, assocType interface{}) *dataloader.Loader {
 	fn := func(ctx context.Context, keys []string) []*dataloader.Result {
+		uniqueKeys := uniqueKeys(keys)
+
 		assocT := reflect.TypeOf(assocType)
 		ptr := reflect.New(reflect.SliceOf(assocT))
 		res := reflect.Indirect(ptr)
 
 		coll.
-			Where("id in (?)", keys).
+			Where("id in (?)", uniqueKeys).
 			All(ptr.Interface())
 
 		mapType := reflect.MapOf(reflect.TypeOf(""), assocT)
@@ -99,13 +118,15 @@ func NewBelongsToAssocLoader(coll *db.Collection, assocType interface{}) *datalo
 // The query must also accept a single injected value, the list of ids to query against.
 func instanceCountLoader(db *db.DB, sql string) *dataloader.Loader {
 	fn := func(ctx context.Context, keys []string) []*dataloader.Result {
+		uniqueKeys := uniqueKeys(keys)
+
 		type Result struct {
 			ID    string
 			Count int
 		}
 
 		var results []Result
-		db.Raw(sql, keys).Scan(&results)
+		db.Raw(sql, uniqueKeys).Scan(&results)
 
 		m := make(map[string]int)
 		for i := range results {
