@@ -250,11 +250,7 @@ willAppear model =
             Task.succeed model
         else
             tasks
-                |> Task.andThen
-                    (\responses ->
-                        List.foldl handleResponses model responses
-                            |> Task.succeed
-                    )
+                |> Task.andThen ((List.foldl handleResponses model) >> Task.succeed)
 
 
 didAppear : Model -> ( Model, Cmd Msg )
