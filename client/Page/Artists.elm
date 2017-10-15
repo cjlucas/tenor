@@ -181,7 +181,9 @@ setInfiniteScrollLoadFunc : (IS.Direction -> Cmd Msg) -> Model -> Model
 setInfiniteScrollLoadFunc loadFunc model =
     let
         infiniteScroll =
-            model.infiniteScroll |> IS.loadMoreCmd loadFunc
+            model.infiniteScroll
+                |> IS.stopLoading
+                |> IS.loadMoreCmd loadFunc
     in
         { model | infiniteScroll = infiniteScroll }
 
