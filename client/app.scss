@@ -54,34 +54,22 @@ scrollable view, one can be created with a height of 100%.
   width: 100%;
   height: 100%;
   margin: 0;
-  display: flex;
-  flex-flow: row wrap;
 }
 
 .main {
-    flex: 1 1 auto;
+    position: absolute;
+    top: 80px;
+    bottom: 0;
+    width: 100%;
     overflow: hidden;
 }
 
 .header {
   height: 80px;
-  flex: 1 100%; // width of 100%
 }
 
-/*
-There may be a better way to solve this, but using 100% seems to
-calculate the height of the entire viewport, rather than the height
-of it's parent, truncating the child view.
-
-We offset the height of the header to counteract this behavior.
-
-NOTE: Turns out this solution sucks. calc is only evaluted during initial
-rendering, meaning if the window is resized, the height of the page
-frame is not recalculated, leaving the bottom content of any
-full-height-scrollable views inaccessable.
-*/
 .page-frame {
-    height: calc(100% - 80px);
+    height: 100%;
 }
 
 .sidebar {
