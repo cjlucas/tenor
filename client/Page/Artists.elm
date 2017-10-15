@@ -406,10 +406,10 @@ viewAlbum album =
         albumImage album =
             case album.imageId of
                 Just id ->
-                    img [ class "fit", src ("/image/" ++ id) ] []
+                    img [ src ("/image/" ++ id) ] []
 
                 Nothing ->
-                    img [ class "fit", src "/static/images/missing_artwork.svg" ] []
+                    img [ src "/static/images/missing_artwork.svg" ] []
 
         albumDuration : Album -> String
         albumDuration album =
