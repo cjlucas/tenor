@@ -15,6 +15,9 @@ import Dom
 import Dom.Scroll
 import Date exposing (Date)
 import Date.Extra
+import Dict exposing (Dict)
+import InfiniteScroll as IS
+import Json.Decode
 
 
 -- Model
@@ -143,12 +146,60 @@ type alias Model =
     { artists : List SidebarArtist
     , sidebarYPos : Float
     , albumsYPos : Float
-    , selectedArtist : Maybe Artist
+    , selectedArtists : List Artist
+    , albumMap : Dict String Album
+    , infiniteScroll : IS.Model Msg
     }
+
+
+resetSelectedArtists : Model -> Model
+resetSelectedArtists model =
+    { model
+        | selectedArtists = []
+        , albumMap = Dict.empty
+    }
+
+
+addSelectedArtists : List Artist -> Model -> Model
+addSelectedArtists artists model =
+    let
+        indexAlbum album dict =
+            Dict.insert album.id album dict
+
+        albumMap =
+            artists
+                |> List.concatMap .albums
+                |> List.foldl indexAlbum model.albumMap
+    in
+        { model
+            | selectedArtists = model.selectedArtists ++ artists
+            , albumMap = albumMap
+        }
+
+
+setInfiniteScrollLoadFunc : (IS.Direction -> Cmd Msg) -> Model -> Model
+setInfiniteScrollLoadFunc loadFunc model =
+    let
+        infiniteScroll =
+            model.infiniteScroll
+                |> IS.stopLoading
+                |> IS.loadMoreCmd loadFunc
+    in
+        { model | infiniteScroll = infiniteScroll }
 
 
 
 -- Init
+
+
+type InitialResponses
+    = SidebarArtists (Api.Connection SidebarArtist)
+    | SelectedArtists (Api.Connection Artist)
+
+
+defaultAllArtistsInfiniteScroll =
+    IS.init (loadArtists Nothing)
+        |> IS.offset 2000
 
 
 init : Model
@@ -156,7 +207,9 @@ init =
     { artists = []
     , sidebarYPos = 0
     , albumsYPos = 0
-    , selectedArtist = Nothing
+    , selectedArtists = []
+    , albumMap = Dict.empty
+    , infiniteScroll = defaultAllArtistsInfiniteScroll
     }
 
 
@@ -172,13 +225,32 @@ willAppear model =
                     List.map .node connection.edges
             in
                 { model | artists = artists }
+
+        tasks =
+            Task.sequence
+                [ Api.getAlbumArtists 500 Nothing spec
+                    |> Api.sendRequest
+                    |> Task.map SidebarArtists
+                , loadArtistsTask Nothing
+                    |> Task.map SelectedArtists
+                ]
+
+        extractArtists connection =
+            List.map .node connection.edges
+
+        handleResponses response model =
+            case response of
+                SidebarArtists connection ->
+                    { model | artists = extractArtists connection }
+
+                SelectedArtists connection ->
+                    handleLoadArtistsResponse connection model
     in
         if List.length model.artists > 0 then
             Task.succeed model
         else
-            (Api.getAlbumArtists spec)
-                |> Api.sendRequest
-                |> Task.andThen (handleArtistConnection >> Task.succeed)
+            tasks
+                |> Task.andThen ((List.foldl handleResponses model) >> Task.succeed)
 
 
 didAppear : Model -> ( Model, Cmd Msg )
@@ -209,9 +281,12 @@ type OutMsg
 type Msg
     = SelectedArtist String
     | GotArtist (Result GraphQL.Client.Http.Error Artist)
+    | GotArtists (Result GraphQL.Client.Http.Error (Api.Connection Artist))
+    | SelectedAllArtists
     | SelectedTrack String String
     | SidebarScroll Float
-    | AlbumsScroll Float
+    | AlbumsScroll Json.Decode.Value
+    | InfiniteScrollMsg IS.Msg
     | NoopScroll (Result Dom.Error ())
 
 
@@ -224,25 +299,39 @@ update msg model =
                         |> Api.sendRequest
                         |> Task.attempt GotArtist
             in
-                ( model, cmd, Nothing )
+                ( setInfiniteScrollLoadFunc noopLoadMore model, cmd, Nothing )
 
         GotArtist (Ok artist) ->
             let
                 cmd =
                     Dom.Scroll.toY "albums" 0 |> Task.attempt NoopScroll
 
-                justArtist =
-                    artist
-                        |> sortAlbums
-                        |> Just
+                model_ =
+                    model
+                        |> resetSelectedArtists
+                        |> addSelectedArtists [ artist ]
             in
-                ( { model | selectedArtist = justArtist }, cmd, Nothing )
+                ( model_, cmd, Nothing )
+
+        SelectedAllArtists ->
+            let
+                model_ =
+                    model
+                        |> resetSelectedArtists
+                        |> setInfiniteScrollLoadFunc (loadArtists Nothing)
+            in
+                ( model_
+                , loadArtistsTask Nothing |> Task.attempt GotArtists
+                , Nothing
+                )
+
+        GotArtists (Ok connection) ->
+            ( handleLoadArtistsResponse connection model, Cmd.none, Nothing )
 
         SelectedTrack albumId trackId ->
             let
                 maybeAlbum =
-                    model.selectedArtist
-                        |> Maybe.andThen (findAlbum albumId)
+                    Dict.get albumId model.albumMap
 
                 tracks =
                     case maybeAlbum of
@@ -259,11 +348,53 @@ update msg model =
         SidebarScroll pos ->
             ( { model | sidebarYPos = pos }, Cmd.none, Nothing )
 
-        AlbumsScroll pos ->
-            ( { model | albumsYPos = pos }, Cmd.none, Nothing )
+        AlbumsScroll value ->
+            let
+                cmd =
+                    IS.cmdFromScrollEvent InfiniteScrollMsg value
+            in
+                case Json.Decode.decodeValue Utils.onScrollDecoder value of
+                    Ok pos ->
+                        ( { model | albumsYPos = pos }, cmd, Nothing )
 
+                    Err err ->
+                        ( model, cmd, Nothing )
+
+        InfiniteScrollMsg msg ->
+            let
+                ( infiniteScroll, cmd ) =
+                    IS.update InfiniteScrollMsg msg model.infiniteScroll
+            in
+                ( { model | infiniteScroll = infiniteScroll }, cmd, Nothing )
+
+        -- TODO: Remove me
         _ ->
             ( model, Cmd.none, Nothing )
+
+
+loadArtistsTask maybeCursor =
+    let
+        limit =
+            20
+
+        spec =
+            Api.connectionSpec "artist" artistSpec
+    in
+        Api.getAlbumArtists limit maybeCursor spec |> Api.sendRequest
+
+
+loadArtists maybeCursor direction =
+    loadArtistsTask maybeCursor |> Task.attempt GotArtists
+
+
+noopLoadMore direction =
+    Cmd.none
+
+
+handleLoadArtistsResponse connection model =
+    model
+        |> addSelectedArtists (List.map .node connection.edges)
+        |> setInfiniteScrollLoadFunc (loadArtists (Just connection.endCursor))
 
 
 
@@ -315,19 +446,22 @@ viewAlbum album =
         )
 
 
-viewAlbums model =
-    case model.selectedArtist of
-        Just artist ->
-            div []
-                [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
-                , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
-                ]
-
-        Nothing ->
-            text ""
-
-
 viewArtist artist =
+    div []
+        [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
+        , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
+        ]
+
+
+viewSidebarEntry viewContent onClickMsg =
+    div
+        [ class "pointer right-align border-bottom"
+        , onClick onClickMsg
+        ]
+        [ viewContent ]
+
+
+viewSidebarArtist artist =
     let
         artistInfo =
             String.join " "
@@ -343,22 +477,55 @@ viewArtist artist =
                   else
                     "tracks"
                 ]
+
+        viewContent =
+            div []
+                [ div
+                    [ class "h3 bold pl2 pb1 pt2" ]
+                    [ text artist.name ]
+                , div
+                    [ class "h5 pb1" ]
+                    [ text artistInfo ]
+                ]
+    in
+        viewSidebarEntry viewContent (SelectedArtist artist.id)
+
+
+viewSidebar artists =
+    let
+        allArtistsEntryContent =
+            div [ class "h3 bold pt2 pb2" ] [ text "All Artists" ]
+
+        allArtistsEntry =
+            viewSidebarEntry allArtistsEntryContent SelectedAllArtists
+
+        viewEntries =
+            allArtistsEntry :: (List.map viewSidebarArtist artists)
     in
         div
-            [ class "pointer right-align border-bottom"
-            , onClick (SelectedArtist artist.id)
+            [ id "sidebar"
+            , class "sidebar pr3"
+            , onScroll SidebarScroll
             ]
-            [ div
-                [ class "h3 bold pl2 pb1 pt2"
-                ]
-                [ text artist.name ]
-            , div [ class "h5 pb1" ] [ text artistInfo ]
+            viewEntries
+
+
+viewMain model =
+    let
+        artists =
+            model.selectedArtists
+    in
+        div
+            [ id "albums"
+            , class "content flex-auto pl4 pr4 mb4 pt2"
+            , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
             ]
+            (List.map viewArtist artists)
 
 
 view model =
     div [ class "main flex" ]
-        [ div [ id "sidebar", class "sidebar pr3", onScroll SidebarScroll ] (List.map viewArtist model.artists)
+        [ viewSidebar model.artists
         , span [ class "divider mt2 mb2" ] []
-        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2", onScroll AlbumsScroll ] [ viewAlbums model ]
+        , viewMain model
         ]
