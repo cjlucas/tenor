@@ -61,18 +61,22 @@ sendRequest request =
                 |> GraphQLHttp.sendMutation endpointUrl
 
 
-getAlbumArtists outSpec =
+getAlbumArtists limit cursor outSpec =
     let
         firstArg =
             Var.required "first" .first Var.int
 
+        afterArg =
+            Var.required "after" .after (Var.nullable Var.string)
+
         args =
-            { first = 500 }
+            { first = limit, after = cursor }
 
         docSpec =
             extract
                 (field "artists"
                     [ ( "first", Arg.variable firstArg )
+                    , ( "after", Arg.variable afterArg )
                     ]
                     outSpec
                 )

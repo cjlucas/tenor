@@ -16,6 +16,7 @@ import Dom.Scroll
 import Date exposing (Date)
 import Date.Extra
 import Dict exposing (Dict)
+import InfiniteScroll as IS
 
 
 -- Model
@@ -141,7 +142,7 @@ findAlbum id artist =
 
 
 type SelectionMode
-    = AllArtists (List Artist)
+    = AllArtists (IS.Model Msg) (List Artist)
     | SingleArtist Artist
 
 
@@ -158,12 +159,26 @@ type alias Model =
 -- Init
 
 
+type InitialResponses
+    = SidebarArtists (Api.Connection SidebarArtist)
+    | SelectedArtists (Api.Connection Artist)
+
+
+initialAllArtistsSelection =
+    let
+        infiniteScroll =
+            IS.init (loadArtists Nothing)
+                |> IS.offset 2000
+    in
+        AllArtists infiniteScroll []
+
+
 init : Model
 init =
     { artists = []
     , sidebarYPos = 0
     , albumsYPos = 0
-    , selectionMode = AllArtists []
+    , selectionMode = initialAllArtistsSelection
     , albumMap = Dict.empty
     }
 
@@ -180,13 +195,36 @@ willAppear model =
                     List.map .node connection.edges
             in
                 { model | artists = artists }
+
+        tasks =
+            Task.sequence
+                [ Api.getAlbumArtists 500 Nothing spec
+                    |> Api.sendRequest
+                    |> Task.map SidebarArtists
+                , loadArtistsTask Nothing
+                    |> Task.map SelectedArtists
+                ]
+
+        extractArtists connection =
+            List.map .node connection.edges
+
+        handleResponses response model =
+            case response of
+                SidebarArtists connection ->
+                    { model | artists = extractArtists connection }
+
+                SelectedArtists connection ->
+                    handleLoadArtistsResponse connection model
     in
         if List.length model.artists > 0 then
             Task.succeed model
         else
-            (Api.getAlbumArtists spec)
-                |> Api.sendRequest
-                |> Task.andThen (handleArtistConnection >> Task.succeed)
+            tasks
+                |> Task.andThen
+                    (\responses ->
+                        List.foldl handleResponses model responses
+                            |> Task.succeed
+                    )
 
 
 didAppear : Model -> ( Model, Cmd Msg )
@@ -217,10 +255,12 @@ type OutMsg
 type Msg
     = SelectedArtist String
     | GotArtist (Result GraphQL.Client.Http.Error Artist)
+    | GotArtists (Result GraphQL.Client.Http.Error (Api.Connection Artist))
     | SelectedAllArtists
     | SelectedTrack String String
     | SidebarScroll Float
     | AlbumsScroll Float
+    | InfiniteScrollMsg IS.Msg
     | NoopScroll (Result Dom.Error ())
 
 
@@ -254,7 +294,15 @@ update msg model =
                 )
 
         SelectedAllArtists ->
-            ( { model | selectionMode = AllArtists [] }, Cmd.none, Nothing )
+            ( { model
+                | selectionMode = initialAllArtistsSelection
+              }
+            , loadArtistsTask Nothing |> Task.attempt GotArtists
+            , Nothing
+            )
+
+        GotArtists (Ok connection) ->
+            ( handleLoadArtistsResponse connection model, Cmd.none, Nothing )
 
         SelectedTrack albumId trackId ->
             let
@@ -279,8 +327,61 @@ update msg model =
         AlbumsScroll pos ->
             ( { model | albumsYPos = pos }, Cmd.none, Nothing )
 
+        InfiniteScrollMsg msg ->
+            let
+                ( selectionMode, cmd ) =
+                    case model.selectionMode of
+                        AllArtists infiniteScroll artists ->
+                            let
+                                ( is, cmd ) =
+                                    IS.update InfiniteScrollMsg msg infiniteScroll
+                            in
+                                ( AllArtists is artists, cmd )
+
+                        -- TODO: BADDDDDDD
+                        other ->
+                            ( other, Cmd.none )
+            in
+                ( { model | selectionMode = selectionMode }, cmd, Nothing )
+
+        -- TODO: Remove me
         _ ->
             ( model, Cmd.none, Nothing )
+
+
+loadArtistsTask maybeCursor =
+    let
+        limit =
+            20
+
+        spec =
+            Api.connectionSpec "artist" artistSpec
+    in
+        Api.getAlbumArtists limit maybeCursor spec |> Api.sendRequest
+
+
+loadArtists maybeCursor direction =
+    loadArtistsTask maybeCursor |> Task.attempt GotArtists
+
+
+handleLoadArtistsResponse connection model =
+    let
+        newArtists =
+            List.map .node connection.edges
+
+        ( infiniteScroll, artists ) =
+            case model.selectionMode of
+                AllArtists infiniteScroll artists ->
+                    ( infiniteScroll, artists ++ newArtists )
+
+                _ ->
+                    Debug.crash "THIS SHOULD NEVER HAPPEN"
+
+        infiniteScroll_ =
+            infiniteScroll
+                |> IS.loadMoreCmd (loadArtists (Just connection.endCursor))
+    in
+        { model | selectionMode = AllArtists infiniteScroll_ artists }
 
 
 
@@ -398,19 +499,25 @@ viewSidebar artists =
 
 viewMain model =
     let
-        artists =
+        ( attrs, artists ) =
             case model.selectionMode of
-                AllArtists artists ->
-                    artists
+                AllArtists infiniteScroll artists ->
+                    let
+                        attr =
+                            IS.infiniteScroll InfiniteScrollMsg
+                    in
+                        ( [ attr ], artists )
 
                 SingleArtist artist ->
-                    [ artist ]
+                    ( [], [ artist ] )
     in
         div
-            [ id "albums"
-            , class "content flex-auto pl4 pr4 mb4 pt2"
-            , onScroll AlbumsScroll
-            ]
+            ([ id "albums"
+             , class "content flex-auto pl4 pr4 mb4 pt2"
+             , onScroll AlbumsScroll
+             ]
+                ++ attrs
+            )
             (List.map viewArtist artists)
 
 
