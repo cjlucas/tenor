@@ -625,7 +625,7 @@ viewHeader player =
             ]
                 |> List.map
                     (\( item, pageNmae ) ->
-                        li [ class "h3 inline-block m2", onClick (LoadPage pageNmae) ]
+                        li [ class "h3 inline-block m2 pointer", onClick (LoadPage pageNmae) ]
                             [ text item ]
                     )
 
