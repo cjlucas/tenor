@@ -655,8 +655,16 @@ viewPage model =
                     Html.map AlbumsMsg <| Page.Albums.view model.albumsPageState
 
 
+viewPageFrame model =
+    div [ class "main" ]
+        [ div [ class "page-frame" ]
+            [ viewPage model
+            ]
+        ]
+
+
 view model =
     div [ class "viewport" ]
         [ viewHeader model.player
-        , Html.map PageMsg <| viewPage model
+        , Html.map PageMsg <| viewPageFrame model
         ]

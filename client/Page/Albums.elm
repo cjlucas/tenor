@@ -498,7 +498,7 @@ view model =
     div []
         [ viewModal model.selectedAlbum
         , div
-            [ class "main content mx-auto"
+            [ class "full-height-scrollable mx-auto"
             , id "viewport"
             , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
             ]

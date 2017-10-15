@@ -504,7 +504,7 @@ viewSidebar artists =
     in
         div
             [ id "sidebar"
-            , class "sidebar pr3"
+            , class "full-height-scrollable sidebar pr3"
             , onScroll SidebarScroll
             ]
             viewEntries
@@ -517,14 +517,14 @@ viewMain model =
     in
         div
             [ id "albums"
-            , class "content flex-auto pl4 pr4 mb4 pt2"
+            , class "full-height-scrollable content flex-auto pl4 pr4 mb4 pt2"
             , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
             ]
             (List.map viewArtist artists)
 
 
 view model =
-    div [ class "main flex" ]
+    div [ class "flex" ]
         [ viewSidebar model.artists
         , span [ class "divider mt2 mb2" ] []
         , viewMain model
