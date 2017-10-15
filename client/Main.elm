@@ -155,29 +155,32 @@ type alias Track =
 
 
 type Page
-    = Blank
-    | Artists Page.Artists.Model
+    = Artists Page.Artists.Model
     | Albums Page.Albums.Model
 
 
 type PageState
-    = TransitioningFrom Page
-    | PageLoaded Page -- Name conflict with BufferingState. If/when Player is refacted out, rename this
+    = PageLoading
+    | PageLoaded -- Name conflict with BufferingState. If/when Player is refacted out, rename this
 
 
 type alias Model =
     { player : Player
     , pageState : PageState
+    , currentRoute : Route
+    , artistsPageState : Page.Artists.Model
+    , albumsPageState : Page.Albums.Model
     }
 
 
-currentPage model =
-    case model.pageState of
-        TransitioningFrom page ->
-            page
+setPageState : Page -> Model -> Model
+setPageState page model =
+    case page of
+        Artists pageModel ->
+            { model | artistsPageState = pageModel }
 
-        PageLoaded page ->
-            page
+        Albums pageModel ->
+            { model | albumsPageState = pageModel }
 
 
 
@@ -185,7 +188,16 @@ currentPage model =
 
 
 init =
-    ( { player = defaultPlayer, pageState = PageLoaded Blank }, Cmd.none )
+    let
+        model =
+            { player = defaultPlayer
+            , pageState = PageLoaded
+            , currentRoute = Route.Artists
+            , artistsPageState = Page.Artists.init
+            , albumsPageState = Page.Albums.init
+            }
+    in
+        loadPage Route.Artists model
 
 
 
@@ -211,7 +223,7 @@ type PageMsg
 type Msg
     = NoOp
     | LoadPage Route
-    | PageInitResponse (Result GraphQL.Client.Http.Error Page)
+    | ShowPage (Result GraphQL.Client.Http.Error Page)
     | PageMsg PageMsg
     | PlayerEvent PlayerEvent
     | TogglePlayPause
@@ -221,48 +233,25 @@ type Msg
 
 update msg model =
     case msg of
-        LoadPage name ->
-            case name of
-                Route.Artists ->
-                    let
-                        ( pageModel, task ) =
-                            Page.Artists.init
+        LoadPage route ->
+            loadPage route model
 
-                        cmd =
-                            task |> Task.map Artists |> Task.attempt PageInitResponse
-                    in
-                        ( { model | pageState = TransitioningFrom Blank }, cmd )
+        ShowPage (Ok page) ->
+            let
+                ( page_, cmd ) =
+                    pageDidAppear page
 
-                Route.Albums ->
-                    let
-                        ( pageModel, task ) =
-                            Page.Albums.init
+                model_ =
+                    { model | pageState = PageLoaded }
+                        |> setPageState page_
+            in
+                ( model_, cmd )
 
-                        cmd =
-                            task |> Task.map Albums |> Task.attempt PageInitResponse
-                    in
-                        ( { model | pageState = TransitioningFrom Blank }, cmd )
-
-        PageInitResponse (Ok page) ->
-            ( { model | pageState = PageLoaded page }, Cmd.none )
-
-        PageInitResponse (Err err) ->
+        ShowPage (Err err) ->
             ( model, Cmd.none )
 
         PageMsg msg ->
-            let
-                ( page, model_, cmd ) =
-                    updatePage msg (currentPage model) model
-
-                pageState =
-                    case model.pageState of
-                        TransitioningFrom _ ->
-                            TransitioningFrom page
-
-                        PageLoaded _ ->
-                            PageLoaded page
-            in
-                ( { model_ | pageState = pageState }, cmd )
+            updatePage msg model
 
         PlayerEvent event ->
             let
@@ -312,13 +301,59 @@ resetPlayerWithTracks tracks model =
         ( { model | player = player_ }, Ports.reset )
 
 
-updatePage : PageMsg -> Page -> Model -> ( Page, Model, Cmd Msg )
-updatePage msg page model =
-    case ( msg, page ) of
-        ( ArtistsMsg msg, Artists pageModel ) ->
+loadPage : Route -> Model -> ( Model, Cmd Msg )
+loadPage route model =
+    let
+        task =
+            case route of
+                Route.Artists ->
+                    Page.Artists.willAppear model.artistsPageState
+                        |> Task.map Artists
+
+                Route.Albums ->
+                    Page.Albums.willAppear model.albumsPageState
+                        |> Maybe.withDefault (Task.succeed model.albumsPageState)
+                        |> Task.map Albums
+
+        cmd =
+            Task.attempt ShowPage task
+    in
+        ( { model | currentRoute = route, pageState = PageLoading }, cmd )
+
+
+pageDidAppear : Page -> ( Page, Cmd Msg )
+pageDidAppear page =
+    let
+        didAppear pageTag pageMsgTag didAppearFn pageModel =
+            let
+                ( pageModel_, cmd ) =
+                    didAppearFn pageModel
+            in
+                ( pageTag pageModel
+                , Cmd.map (PageMsg << pageMsgTag) cmd
+                )
+    in
+        case page of
+            Artists pageModel ->
+                didAppear Artists
+                    ArtistsMsg
+                    Page.Artists.didAppear
+                    pageModel
+
+            Albums pageModel ->
+                didAppear Albums
+                    AlbumsMsg
+                    Page.Albums.didAppear
+                    pageModel
+
+
+updatePage : PageMsg -> Model -> ( Model, Cmd Msg )
+updatePage msg model =
+    case msg of
+        ArtistsMsg msg ->
             let
                 ( pageModel_, pageCmd, outMsg ) =
-                    Page.Artists.update msg pageModel
+                    Page.Artists.update msg model.artistsPageState
 
                 ( model_, cmd ) =
                     case outMsg of
@@ -334,12 +369,12 @@ updatePage msg page model =
                         , cmd
                         ]
             in
-                ( Artists pageModel_, model_, batchCmd )
+                ( { model_ | artistsPageState = pageModel_ }, batchCmd )
 
-        ( AlbumsMsg msg, Albums pageModel ) ->
+        AlbumsMsg msg ->
             let
                 ( pageModel_, pageCmd, outMsg ) =
-                    Page.Albums.update msg pageModel
+                    Page.Albums.update msg model.albumsPageState
 
                 ( model_, resetCmd ) =
                     case outMsg of
@@ -355,10 +390,7 @@ updatePage msg page model =
                         , resetCmd
                         ]
             in
-                ( Albums pageModel_, model_, cmd )
-
-        _ ->
-            ( page, model, Cmd.none )
+                ( { model_ | albumsPageState = pageModel_ }, cmd )
 
 
 playNextTrack : Player -> ( Player, Cmd Msg )
@@ -609,29 +641,22 @@ viewHeader player =
             ]
 
 
-viewPage pageState =
-    let
-        page =
-            case pageState of
-                TransitioningFrom page ->
-                    page
+viewPage model =
+    case model.pageState of
+        PageLoading ->
+            text ""
 
-                PageLoaded page ->
-                    page
-    in
-        case page of
-            Artists model ->
-                Html.map ArtistsMsg <| Page.Artists.view model
+        PageLoaded ->
+            case model.currentRoute of
+                Route.Artists ->
+                    Html.map ArtistsMsg <| Page.Artists.view model.artistsPageState
 
-            Albums model ->
-                Html.map AlbumsMsg <| Page.Albums.view model
-
-            Blank ->
-                text ""
+                Route.Albums ->
+                    Html.map AlbumsMsg <| Page.Albums.view model.albumsPageState
 
 
 view model =
     div [ class "viewport" ]
         [ viewHeader model.player
-        , Html.map PageMsg <| viewPage model.pageState
+        , Html.map PageMsg <| viewPage model
         ]
