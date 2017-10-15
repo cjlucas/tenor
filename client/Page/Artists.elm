@@ -15,6 +15,7 @@ import Dom
 import Dom.Scroll
 import Date exposing (Date)
 import Date.Extra
+import Dict exposing (Dict)
 
 
 -- Model
@@ -143,7 +144,8 @@ type alias Model =
     { artists : List SidebarArtist
     , sidebarYPos : Float
     , albumsYPos : Float
-    , selectedArtist : Maybe Artist
+    , selectedArtists : List Artist
+    , albumMap : Dict String Album
     }
 
 
@@ -156,7 +158,8 @@ init =
     { artists = []
     , sidebarYPos = 0
     , albumsYPos = 0
-    , selectedArtist = Nothing
+    , selectedArtists = []
+    , albumMap = Dict.empty
     }
 
 
@@ -231,18 +234,23 @@ update msg model =
                 cmd =
                     Dom.Scroll.toY "albums" 0 |> Task.attempt NoopScroll
 
-                justArtist =
-                    artist
-                        |> sortAlbums
-                        |> Just
+                albumMap =
+                    artist.albums
+                        |> List.map (\album -> ( album.id, album ))
+                        |> Dict.fromList
             in
-                ( { model | selectedArtist = justArtist }, cmd, Nothing )
+                ( { model
+                    | selectedArtists = [ sortAlbums artist ]
+                    , albumMap = albumMap
+                  }
+                , cmd
+                , Nothing
+                )
 
         SelectedTrack albumId trackId ->
             let
                 maybeAlbum =
-                    model.selectedArtist
-                        |> Maybe.andThen (findAlbum albumId)
+                    Dict.get albumId model.albumMap
 
                 tracks =
                     case maybeAlbum of
@@ -315,19 +323,14 @@ viewAlbum album =
         )
 
 
-viewAlbums model =
-    case model.selectedArtist of
-        Just artist ->
-            div []
-                [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
-                , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
-                ]
-
-        Nothing ->
-            text ""
-
-
 viewArtist artist =
+    div []
+        [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
+        , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
+        ]
+
+
+viewSidebarArtist artist =
     let
         artistInfo =
             String.join " "
@@ -356,9 +359,13 @@ viewArtist artist =
             ]
 
 
+viewSidebar artists =
+    div [ id "sidebar", class "sidebar pr3", onScroll SidebarScroll ] (List.map viewSidebarArtist artists)
+
+
 view model =
     div [ class "main flex" ]
-        [ div [ id "sidebar", class "sidebar pr3", onScroll SidebarScroll ] (List.map viewArtist model.artists)
+        [ viewSidebar model.artists
         , span [ class "divider mt2 mb2" ] []
-        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2", onScroll AlbumsScroll ] [ viewAlbums model ]
+        , div [ id "albums", class "content flex-auto pl4 pr4 mb4 pt2", onScroll AlbumsScroll ] (List.map viewArtist model.selectedArtists)
         ]
