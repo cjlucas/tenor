@@ -151,6 +151,40 @@ type alias Model =
     }
 
 
+resetSelectedArtists : Model -> Model
+resetSelectedArtists model =
+    { model
+        | selectedArtists = []
+        , albumMap = Dict.empty
+    }
+
+
+addSelectedArtists : List Artist -> Model -> Model
+addSelectedArtists artists model =
+    let
+        indexAlbum album dict =
+            Dict.insert album.id album dict
+
+        albumMap =
+            artists
+                |> List.concatMap .albums
+                |> List.foldl indexAlbum model.albumMap
+    in
+        { model
+            | selectedArtists = model.selectedArtists ++ artists
+            , albumMap = albumMap
+        }
+
+
+setInfiniteScrollLoadFunc : (IS.Direction -> Cmd Msg) -> Model -> Model
+setInfiniteScrollLoadFunc loadFunc model =
+    let
+        infiniteScroll =
+            model.infiniteScroll |> IS.loadMoreCmd loadFunc
+    in
+        { model | infiniteScroll = infiniteScroll }
+
+
 
 -- Init
 
@@ -265,39 +299,32 @@ update msg model =
                     (Api.getArtist id artistSpec)
                         |> Api.sendRequest
                         |> Task.attempt GotArtist
-
-                infiniteScroll =
-                    IS.init noopLoadMore
             in
-                ( { model | infiniteScroll = infiniteScroll }, cmd, Nothing )
+                ( setInfiniteScrollLoadFunc noopLoadMore model, cmd, Nothing )
 
         GotArtist (Ok artist) ->
             let
                 cmd =
                     Dom.Scroll.toY "albums" 0 |> Task.attempt NoopScroll
 
-                albumMap =
-                    artist.albums
-                        |> List.map (\album -> ( album.id, album ))
-                        |> Dict.fromList
+                model_ =
+                    model
+                        |> resetSelectedArtists
+                        |> addSelectedArtists [ artist ]
             in
-                ( { model
-                    | selectedArtists = [ artist ]
-                    , albumMap = albumMap
-                  }
-                , cmd
-                , Nothing
-                )
+                ( model_, cmd, Nothing )
 
         SelectedAllArtists ->
-            ( { model
-                | selectedArtists = []
-                , infiniteScroll = defaultAllArtistsInfiniteScroll
-                , albumMap = Dict.empty
-              }
-            , loadArtistsTask Nothing |> Task.attempt GotArtists
-            , Nothing
-            )
+            let
+                model_ =
+                    model
+                        |> resetSelectedArtists
+                        |> setInfiniteScrollLoadFunc (loadArtists Nothing)
+            in
+                ( model_
+                , loadArtistsTask Nothing |> Task.attempt GotArtists
+                , Nothing
+                )
 
         GotArtists (Ok connection) ->
             ( handleLoadArtistsResponse connection model, Cmd.none, Nothing )
@@ -357,27 +384,9 @@ noopLoadMore direction =
 
 
 handleLoadArtistsResponse connection model =
-    let
-        newArtists =
-            List.map .node connection.edges
-
-        indexAlbum album dict =
-            Dict.insert album.id album dict
-
-        albumMap =
-            newArtists
-                |> List.concatMap .albums
-                |> List.foldl indexAlbum model.albumMap
-
-        infiniteScroll =
-            model.infiniteScroll
-                |> IS.loadMoreCmd (loadArtists (Just connection.endCursor))
-    in
-        { model
-            | selectedArtists = model.selectedArtists ++ newArtists
-            , infiniteScroll = infiniteScroll
-            , albumMap = albumMap
-        }
+    model
+        |> addSelectedArtists (List.map .node connection.edges)
+        |> setInfiniteScrollLoadFunc (loadArtists (Just connection.endCursor))
 
 
 
