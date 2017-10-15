@@ -17,6 +17,7 @@ import Date exposing (Date)
 import Date.Extra
 import Dict exposing (Dict)
 import InfiniteScroll as IS
+import Json.Decode
 
 
 -- Model
@@ -286,7 +287,7 @@ type Msg
     | SelectedAllArtists
     | SelectedTrack String String
     | SidebarScroll Float
-    | AlbumsScroll Float
+    | AlbumsScroll Json.Decode.Value
     | InfiniteScrollMsg IS.Msg
     | NoopScroll (Result Dom.Error ())
 
@@ -349,8 +350,17 @@ update msg model =
         SidebarScroll pos ->
             ( { model | sidebarYPos = pos }, Cmd.none, Nothing )
 
-        AlbumsScroll pos ->
-            ( { model | albumsYPos = pos }, Cmd.none, Nothing )
+        AlbumsScroll value ->
+            let
+                cmd =
+                    IS.cmdFromScrollEvent InfiniteScrollMsg value
+            in
+                case Json.Decode.decodeValue Utils.onScrollDecoder value of
+                    Ok pos ->
+                        ( { model | albumsYPos = pos }, cmd, Nothing )
+
+                    Err err ->
+                        ( model, cmd, Nothing )
 
         InfiniteScrollMsg msg ->
             let
@@ -510,8 +520,7 @@ viewMain model =
         div
             [ id "albums"
             , class "content flex-auto pl4 pr4 mb4 pt2"
-            , onScroll AlbumsScroll
-            , IS.infiniteScroll InfiniteScrollMsg
+            , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
             ]
             (List.map viewArtist artists)
 
