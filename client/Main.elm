@@ -237,7 +237,15 @@ update msg model =
             loadPage route model
 
         ShowPage (Ok page) ->
-            showPage page model
+            let
+                ( page_, cmd ) =
+                    pageDidAppear page
+
+                model_ =
+                    { model | pageState = PageLoaded }
+                        |> setPageState page_
+            in
+                ( model_, cmd )
 
         ShowPage (Err err) ->
             ( model, Cmd.none )
@@ -313,21 +321,17 @@ loadPage route model =
         ( { model | currentRoute = route, pageState = PageLoading }, cmd )
 
 
-showPage : Page -> Model -> ( Model, Cmd Msg )
-showPage page model =
+pageDidAppear : Page -> ( Page, Cmd Msg )
+pageDidAppear page =
     let
-        model_ =
-            { model | pageState = PageLoaded }
-
         didAppear pageTag pageMsgTag didAppearFn pageModel =
             let
                 ( pageModel_, cmd ) =
                     didAppearFn pageModel
-
-                model__ =
-                    setPageState (pageTag pageModel_) model_
             in
-                ( model__, cmd |> Cmd.map pageMsgTag |> Cmd.map PageMsg )
+                ( pageTag pageModel
+                , Cmd.map (PageMsg << pageMsgTag) cmd
+                )
     in
         case page of
             Artists pageModel ->
