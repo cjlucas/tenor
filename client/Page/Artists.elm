@@ -1,4 +1,4 @@
-module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, didAppear, update, view)
+module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, didAppear, update, selectArtist, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -297,12 +297,10 @@ update msg model =
     case msg of
         SelectedArtist id ->
             let
-                cmd =
-                    (Api.getArtist id artistSpec)
-                        |> Api.sendRequest
-                        |> Task.attempt GotArtist
+                ( model_, cmd ) =
+                    selectArtist id model
             in
-                ( setInfiniteScrollLoadFunc noopLoadMore model, cmd, Nothing )
+                ( model_, cmd, Nothing )
 
         GotArtist (Ok artist) ->
             let
@@ -373,6 +371,17 @@ update msg model =
         -- TODO: Remove me
         _ ->
             ( model, Cmd.none, Nothing )
+
+
+selectArtist : String -> Model -> ( Model, Cmd Msg )
+selectArtist id model =
+    let
+        cmd =
+            (Api.getArtist id artistSpec)
+                |> Api.sendRequest
+                |> Task.attempt GotArtist
+    in
+        ( setInfiniteScrollLoadFunc noopLoadMore model, cmd )
 
 
 loadArtistsTask maybeCursor =
