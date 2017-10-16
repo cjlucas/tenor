@@ -13,6 +13,7 @@ import Json.Decode as Decode
 import List.Extra
 import Page.Artists
 import Page.Albums
+import Page.Search
 import Route exposing (Route)
 
 
@@ -157,6 +158,7 @@ type alias Track =
 type Page
     = Artists Page.Artists.Model
     | Albums Page.Albums.Model
+    | Search Page.Search.Model
 
 
 type PageState
@@ -170,6 +172,7 @@ type alias Model =
     , currentRoute : Route
     , artistsPageState : Page.Artists.Model
     , albumsPageState : Page.Albums.Model
+    , searchPageState : Page.Search.Model
     }
 
 
@@ -181,6 +184,9 @@ setPageState page model =
 
         Albums pageModel ->
             { model | albumsPageState = pageModel }
+
+        Search pageModel ->
+            { model | searchPageState = pageModel }
 
 
 
@@ -195,6 +201,7 @@ init =
             , currentRoute = Route.Artists
             , artistsPageState = Page.Artists.init
             , albumsPageState = Page.Albums.init
+            , searchPageState = Page.Search.init
             }
     in
         loadPage Route.Artists model
@@ -218,6 +225,7 @@ type PlayerEvent
 type PageMsg
     = ArtistsMsg Page.Artists.Msg
     | AlbumsMsg Page.Albums.Msg
+    | SearchMsg Page.Search.Msg
 
 
 type Msg
@@ -315,6 +323,9 @@ loadPage route model =
                         |> Maybe.withDefault (Task.succeed model.albumsPageState)
                         |> Task.map Albums
 
+                Route.Search ->
+                    Task.map Search <| Task.succeed model.searchPageState
+
         cmd =
             Task.attempt ShowPage task
     in
@@ -345,6 +356,9 @@ pageDidAppear page =
                     AlbumsMsg
                     Page.Albums.didAppear
                     pageModel
+
+            Search pageModel ->
+                ( page, Cmd.none )
 
 
 updatePage : PageMsg -> Model -> ( Model, Cmd Msg )
@@ -391,6 +405,38 @@ updatePage msg model =
                         ]
             in
                 ( { model_ | albumsPageState = pageModel_ }, cmd )
+
+        SearchMsg msg ->
+            let
+                ( pageModel, pageCmd, outMsg ) =
+                    Page.Search.update msg model.searchPageState
+
+                ( model_, cmd ) =
+                    case outMsg of
+                        Just (Page.Search.ChoseArtist id) ->
+                            let
+                                ( artistsState, cmd ) =
+                                    Page.Artists.selectArtist id model.artistsPageState
+                            in
+                                ( { model
+                                    | currentRoute = Route.Artists
+                                    , artistsPageState = artistsState
+                                  }
+                                , Cmd.map (PageMsg << ArtistsMsg) cmd
+                                )
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                batchCmd =
+                    Cmd.batch
+                        [ Cmd.map (PageMsg << SearchMsg) pageCmd
+                        , cmd
+                        ]
+            in
+                ( { model_ | searchPageState = pageModel }
+                , batchCmd
+                )
 
 
 playNextTrack : Player -> ( Player, Cmd Msg )
@@ -621,7 +667,7 @@ viewHeader player =
         viewItems =
             [ ( "Artists", Route.Artists )
             , ( "Albums", Route.Albums )
-            , ( "Up Next", Route.Artists )
+            , ( "Search", Route.Search )
             ]
                 |> List.map
                     (\( item, pageNmae ) ->
@@ -653,6 +699,9 @@ viewPage model =
 
                 Route.Albums ->
                     Html.map AlbumsMsg <| Page.Albums.view model.albumsPageState
+
+                Route.Search ->
+                    Html.map SearchMsg <| Page.Search.view model.searchPageState
 
 
 viewPageFrame model =
