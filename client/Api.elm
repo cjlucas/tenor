@@ -161,3 +161,32 @@ getAlbum id outSpec =
                 )
     in
         Query docSpec args
+
+
+type alias SearchResults artist album track =
+    { artists : List artist
+    , albusm : List album
+    , tracks : List track
+    }
+
+
+search query artistSpec albumSpec trackSpec =
+    let
+        queryArg =
+            Var.required "query" .query Var.string
+
+        searchSpec queryName spec =
+            GraphQL.field queryName
+                [ ( "query", Arg.variable queryArg ) ]
+                spec
+
+        outSpec =
+            object SearchResults
+                |> with (searchSpec "searchArtists" (GraphQL.list artistSpec))
+                |> with (searchSpec "searchAlbums" (GraphQL.list albumSpec))
+                |> with (searchSpec "searchTracks" (GraphQL.list trackSpec))
+
+        args =
+            { query = query }
+    in
+        Query outSpec args
