@@ -110,7 +110,14 @@ update msg model =
                 ( model, cmd, Nothing )
 
         GotResults (Ok results) ->
-            ( { model | artists = results.artists }, Cmd.none, Nothing )
+            let
+                extractNodes =
+                    (List.map .node) << .edges
+
+                artists =
+                    extractNodes results.artists
+            in
+                ( { model | artists = Debug.log "artists " artists }, Cmd.none, Nothing )
 
         GotResults (Err err) ->
             ( model, Cmd.none, Nothing )

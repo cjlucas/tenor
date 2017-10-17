@@ -25,7 +25,8 @@ connectionSpec nodeName spec =
                 |> with (field nodeName [] spec)
     in
         GraphQL.object Connection
-            |> with (field "endCursor" [] string)
+            -- HACK: Properly handle nullable endCursor
+            |> with (field "endCursor" [] (GraphQL.map (Maybe.withDefault "") (nullable string)))
             |> with (field "edges" [] (list edgeSpec))
 
 
@@ -164,9 +165,9 @@ getAlbum id outSpec =
 
 
 type alias SearchResults artist album track =
-    { artists : List artist
-    , albusm : List album
-    , tracks : List track
+    { artists : Connection artist
+    , albusm : Connection album
+    , tracks : Connection track
     }
 
 
@@ -175,18 +176,23 @@ search query artistSpec albumSpec trackSpec =
         queryArg =
             Var.required "query" .query Var.string
 
+        firstArg =
+            Var.required "first" .first Var.int
+
         searchSpec queryName spec =
             GraphQL.field queryName
-                [ ( "query", Arg.variable queryArg ) ]
+                [ ( "query", Arg.variable queryArg )
+                , ( "first", Arg.variable firstArg )
+                ]
                 spec
 
         outSpec =
             object SearchResults
-                |> with (searchSpec "searchArtists" (GraphQL.list artistSpec))
-                |> with (searchSpec "searchAlbums" (GraphQL.list albumSpec))
-                |> with (searchSpec "searchTracks" (GraphQL.list trackSpec))
+                |> with (searchSpec "searchArtists" (connectionSpec "artist" artistSpec))
+                |> with (searchSpec "searchAlbums" (connectionSpec "album" albumSpec))
+                |> with (searchSpec "searchTracks" (connectionSpec "track" trackSpec))
 
         args =
-            { query = query }
+            { query = query, first = 20 }
     in
         Query outSpec args
