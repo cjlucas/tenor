@@ -15,6 +15,7 @@ import Page.Artists
 import Page.Albums
 import Page.Search
 import Route exposing (Route)
+import Dom
 
 
 streamUrl id =
@@ -170,6 +171,7 @@ type alias Model =
     { player : Player
     , pageState : PageState
     , currentRoute : Route
+    , searchInput : String
     , artistsPageState : Page.Artists.Model
     , albumsPageState : Page.Albums.Model
     , searchPageState : Page.Search.Model
@@ -199,6 +201,7 @@ init =
             { player = defaultPlayer
             , pageState = PageLoaded
             , currentRoute = Route.Artists
+            , searchInput = ""
             , artistsPageState = Page.Artists.init
             , albumsPageState = Page.Albums.init
             , searchPageState = Page.Search.init
@@ -237,6 +240,10 @@ type Msg
     | TogglePlayPause
     | PlayNext
     | PlayPrevious
+    | SearchFocus
+    | SearchInput String
+    | SearchSubmit
+    | DomAction (Result Dom.Error ())
 
 
 update msg model =
@@ -292,6 +299,30 @@ update msg model =
                     playPreviousTrack model.player
             in
                 ( { model | player = player }, cmd )
+
+        SearchFocus ->
+            ( { model | searchInput = "" }, Cmd.none )
+
+        SearchInput s ->
+            ( { model | searchInput = s }, Cmd.none )
+
+        SearchSubmit ->
+            let
+                ( pageState, cmd ) =
+                    Page.Search.search model.searchInput model.searchPageState
+            in
+                ( { model
+                    | currentRoute = Route.Search
+                    , searchPageState = pageState
+                  }
+                , Cmd.batch
+                    [ Cmd.map (PageMsg << SearchMsg) cmd
+                    , Dom.blur "search" |> Task.attempt DomAction
+                    ]
+                )
+
+        DomAction _ ->
+            update NoOp model
 
         NoOp ->
             ( model, Cmd.none )
@@ -665,12 +696,14 @@ viewNowPlaying player =
                 text ""
 
 
-viewHeader player =
+viewHeader model =
     let
+        player =
+            model.player
+
         viewItems =
             [ ( "Artists", Route.Artists )
             , ( "Albums", Route.Albums )
-            , ( "Search", Route.Search )
             ]
                 |> List.map
                     (\( item, pageNmae ) ->
@@ -679,7 +712,20 @@ viewHeader player =
                     )
 
         viewMenu =
-            ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
+            div []
+                [ ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
+                , Html.form [ class "inline", onSubmit SearchSubmit ]
+                    [ input
+                        [ id "search"
+                        , class "search p1"
+                        , type_ "text"
+                        , onInput SearchInput
+                        , on "focus" (Decode.succeed SearchFocus)
+                        , value model.searchInput
+                        ]
+                        []
+                    ]
+                ]
     in
         div [ class "header flex pl1 pr1 justify-between items-center border-bottom" ]
             [ div [ class "flex items-center pl2" ]
@@ -717,6 +763,6 @@ viewPageFrame model =
 
 view model =
     div [ class "viewport" ]
-        [ viewHeader model.player
+        [ viewHeader model
         , Html.map PageMsg <| viewPageFrame model
         ]
