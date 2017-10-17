@@ -165,7 +165,7 @@ getAlbum id outSpec =
 
 type alias SearchResults artist album track =
     { artists : Connection artist
-    , albusm : Connection album
+    , albums : Connection album
     , tracks : Connection track
     }
 
