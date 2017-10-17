@@ -404,9 +404,18 @@ noopLoadMore direction =
 
 
 handleLoadArtistsResponse connection model =
-    model
-        |> addSelectedArtists (List.map .node connection.edges)
-        |> setInfiniteScrollLoadFunc (loadArtists (Just connection.endCursor))
+    let
+        loadMoreCmd =
+            case connection.endCursor of
+                Just cursor ->
+                    loadArtists (Just cursor)
+
+                Nothing ->
+                    noopLoadMore
+    in
+        model
+            |> addSelectedArtists (List.map .node connection.edges)
+            |> setInfiniteScrollLoadFunc loadMoreCmd
 
 
 
