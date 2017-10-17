@@ -425,6 +425,9 @@ updatePage msg model =
                                 , Cmd.map (PageMsg << ArtistsMsg) cmd
                                 )
 
+                        Just (Page.Search.PlayTracks tracks) ->
+                            resetPlayerWithTracks tracks model
+
                         Nothing ->
                             ( model, Cmd.none )
 
