@@ -18,6 +18,7 @@ import View.AlbumTracklist
 import Dom
 import Dom.Scroll
 import Json.Decode
+import View.AlbumGrid
 
 
 -- Model
@@ -482,7 +483,7 @@ viewAlbumSection albums key =
     in
         div []
             [ div [ class "h1 bold pb3" ] [ text key ]
-            , div [ class "flex flex-wrap" ] (List.map viewAlbum albums_)
+            , View.AlbumGrid.view SelectedAlbum albums_
             ]
 
 
