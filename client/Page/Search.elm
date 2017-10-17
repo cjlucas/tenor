@@ -120,13 +120,26 @@ update msg model =
 
 
 viewArtist artist =
-    div [ onClick (SelectedArtist artist.id) ] [ text artist.name ]
+    div [ class "col sm-col-12 md-col-6 lg-col-4" ]
+        [ div
+            [ class "mr4 h3 bold pointer border-bottom pt2 pb2 pr2"
+            , onClick (SelectedArtist artist.id)
+            ]
+            [ text artist.name ]
+        ]
+
+
+viewArtistResults artists =
+    div []
+        [ div [ class "h1 bold" ] [ text "Artists" ]
+        , div [ class "flex flex-wrap" ] (List.map viewArtist artists)
+        ]
 
 
 view model =
     div []
         [ Html.form [ onSubmit DoSearch ]
-            [ input [ type_ "text", onInput SearchInput ] []
+            [ input [ type_ "text", onInput SearchInput, value model.searchField ] []
             ]
-        , div [] (List.map viewArtist model.artists)
+        , viewArtistResults model.artists
         ]
