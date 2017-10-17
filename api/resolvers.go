@@ -30,7 +30,7 @@ type cursor struct {
 	ID        string
 }
 
-type connectionResolver struct {
+type collectionResolver struct {
 	// Configuration
 	Collection       *db.Collection
 	Type             interface{}
@@ -45,7 +45,7 @@ type connectionResolver struct {
 	Descending bool   `args:"descending"`
 }
 
-func (r *connectionResolver) validSortableField() bool {
+func (r *collectionResolver) validSortableField() bool {
 	for _, field := range r.SortableFields {
 		if r.OrderBy == field {
 			return true
@@ -55,7 +55,7 @@ func (r *connectionResolver) validSortableField() bool {
 	return false
 }
 
-func (r *connectionResolver) encodeCursor(obj interface{}) string {
+func (r *collectionResolver) encodeCursor(obj interface{}) string {
 	value := reflect.ValueOf(obj)
 	var val string
 	switch r.OrderBy {
@@ -83,7 +83,7 @@ func (r *connectionResolver) encodeCursor(obj interface{}) string {
 	return cursor
 }
 
-func (r *connectionResolver) decodeCursor(s string) (*cursor, error) {
+func (r *collectionResolver) decodeCursor(s string) (*cursor, error) {
 	buf, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return nil, errors.New("error decoding cursor")
@@ -109,7 +109,7 @@ func (r *connectionResolver) decodeCursor(s string) (*cursor, error) {
 	return &cursor{SortField: parts[0], SortValue: val, ID: parts[2]}, nil
 }
 
-func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
+func (r *collectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 	if r.First > 500 {
 		r.First = 500
 	}
