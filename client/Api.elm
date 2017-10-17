@@ -8,7 +8,7 @@ import Task exposing (Task)
 
 
 type alias Connection a =
-    { endCursor : String
+    { endCursor : Maybe String
     , edges : List (Edge a)
     }
 
@@ -25,8 +25,7 @@ connectionSpec nodeName spec =
                 |> with (field nodeName [] spec)
     in
         GraphQL.object Connection
-            -- HACK: Properly handle nullable endCursor
-            |> with (field "endCursor" [] (GraphQL.map (Maybe.withDefault "") (nullable string)))
+            |> with (field "endCursor" [] (nullable string))
             |> with (field "edges" [] (list edgeSpec))
 
 

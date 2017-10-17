@@ -188,9 +188,17 @@ willAppear model =
                 |> Task.andThen
                     (\connection ->
                         let
+                            loadMoreCmd =
+                                case connection.endCursor of
+                                    Just cursor ->
+                                        loadAlbums model.sortOrder 50 (Just cursor)
+
+                                    Nothing ->
+                                        \_ -> Cmd.none
+
                             is =
                                 model.infiniteScroll
-                                    |> IS.loadMoreCmd (loadAlbums model.sortOrder 50 (Just connection.endCursor))
+                                    |> IS.loadMoreCmd loadMoreCmd
 
                             model_ =
                                 setAlbums (List.map .node connection.edges) model
@@ -285,10 +293,21 @@ update msg model =
 
         FetchedAlbums (Ok connection) ->
             let
+                -- Currently the backend doesn't declare that we've reached the
+                -- end of a list, so we use the side endCursor to determine
+                -- if we've hit the end.
+                loadMoreCmd =
+                    case connection.endCursor of
+                        Just cursor ->
+                            loadAlbums model.sortOrder 50 (Just cursor)
+
+                        Nothing ->
+                            \_ -> Cmd.none
+
                 is =
                     model.infiniteScroll
                         |> IS.stopLoading
-                        |> IS.loadMoreCmd (loadAlbums model.sortOrder 50 (Just connection.endCursor))
+                        |> IS.loadMoreCmd loadMoreCmd
 
                 model_ =
                     setAlbums (List.map .node connection.edges) model
