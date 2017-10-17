@@ -1,4 +1,4 @@
-module Page.Search exposing (Model, Msg, OutMsg(..), init, update, view)
+module Page.Search exposing (Model, Msg, OutMsg(..), init, update, search, view)
 
 import GraphQL.Request.Builder as GraphQL
 import GraphQL.Client.Http
@@ -136,7 +136,6 @@ type Msg
     = NoOp
     | DismissModal
     | SearchInput String
-    | DoSearch
     | GotResults (Result GraphQL.Client.Http.Error SearchResults)
     | SelectedArtist String
     | SelectedAlbum String
@@ -148,15 +147,6 @@ update msg model =
     case Debug.log "SEARCH MSG" msg of
         SearchInput s ->
             ( { model | searchField = s }, Cmd.none, Nothing )
-
-        DoSearch ->
-            let
-                cmd =
-                    Api.search model.searchField artistSpec albumSpec trackSpec
-                        |> Api.sendRequest
-                        |> Task.attempt GotResults
-            in
-                ( model, cmd, Nothing )
 
         GotResults (Ok results) ->
             let
@@ -234,6 +224,23 @@ update msg model =
             ( model, Cmd.none, Nothing )
 
 
+search : String -> Model -> ( Model, Cmd Msg )
+search query model =
+    let
+        cmd =
+            Api.search query artistSpec albumSpec trackSpec
+                |> Api.sendRequest
+                |> Task.attempt GotResults
+    in
+        ( { model
+            | artists = []
+            , albums = []
+            , tracks = []
+          }
+        , cmd
+        )
+
+
 viewArtist artist =
     div [ class "col sm-col-12 md-col-6 lg-col-4" ]
         [ div
@@ -278,9 +285,6 @@ viewTrackResults tracks =
 view model =
     div [ class "full-height-scrollable" ]
         [ View.AlbumModal.view DismissModal NoOp SelectedAlbumTrack model.selectedAlbum
-        , Html.form [ onSubmit DoSearch ]
-            [ input [ type_ "text", onInput SearchInput, value model.searchField ] []
-            ]
         , viewArtistResults model.artists
         , viewAlbumResults model.albums
         , viewTrackResults model.tracks

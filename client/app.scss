@@ -209,3 +209,13 @@ scrollable view, one can be created with a height of 100%.
 .dim {
   color: rgba(74, 74, 74, .7);
 }
+
+.search {
+    color: rgba(151, 151, 151, .70);
+    border: 1px solid rgba(151, 151, 151, .25);
+    outline: none;
+}
+.search:focus {
+    color: #4A4A4A;
+    border: 1px solid #18C29C;
+}
