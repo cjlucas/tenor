@@ -238,14 +238,23 @@ func (r *instanceCountResolver) Resolve(ctx context.Context, artist *db.Artist) 
 }
 
 type searchResolver struct {
-	Collection *db.Collection
-	Type       interface{}
-	Trie       *trie.Trie
+	// Configuration
+	Collection       *db.Collection
+	SortableFields   []string
+	DefaultSortField string
+	Type             interface{}
+	Trie             *trie.Trie
 
-	Query string `args:"query"`
+	// Parameters
+	Query      string `args:"query"`
+	First      int    `args:"first"`
+	Before     string `args:"before"`
+	After      string `args:"after"`
+	OrderBy    string `args:"orderBy"`
+	Descending bool   `args:"descending"`
 }
 
-func newSearchResolver(db *db.DB, coll *db.Collection, model interface{}) *searchResolver {
+func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *trie.Trie {
 	modelType := reflect.TypeOf(model)
 	for modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
@@ -269,17 +278,10 @@ func newSearchResolver(db *db.DB, coll *db.Collection, model interface{}) *searc
 
 	rows.Close()
 
-	return &searchResolver{
-		Collection: coll,
-		Type:       model,
-		Trie:       t,
-	}
+	return t
 }
 
 func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
-	sliceType := reflect.SliceOf(reflect.TypeOf(r.Type))
-	emptySlice := reflect.MakeSlice(sliceType, 0, 0).Interface()
-
 	var result *trie.LookupResult
 	for _, s := range strings.Split(r.Query, " ") {
 		res := r.Trie.Lookup(strings.TrimSpace(s))
@@ -291,17 +293,18 @@ func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
 	}
 
 	ids := result.ToSlice()
+	resolver := &collectionResolver{
+		Collection:       r.Collection.Where("id IN (?)", ids),
+		Type:             r.Type,
+		SortableFields:   []string{"name"},
+		DefaultSortField: "name",
 
-	if len(ids) == 0 {
-		return emptySlice, nil
+		First:      r.First,
+		Before:     r.Before,
+		After:      r.After,
+		OrderBy:    r.OrderBy,
+		Descending: r.Descending,
 	}
 
-	out := reflect.New(sliceType)
-	r.Collection.Where("id IN (?)", ids).All(out.Interface())
-
-	if out.IsNil() || out.Elem().Len() == 0 {
-		return emptySlice, nil
-	}
-
-	return out.Elem().Interface(), nil
+	return resolver.Resolve(ctx)
 }
