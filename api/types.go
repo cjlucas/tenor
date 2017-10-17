@@ -531,7 +531,7 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	schema.AddQuery(&Field{
 		Name: "artists",
 		Type: ConnectionObject{Of: artistObject},
-		Resolver: &connectionResolver{
+		Resolver: &collectionResolver{
 			Collection:       &dal.AlbumArtists.Collection,
 			Type:             db.Artist{},
 			SortableFields:   []string{"name"},
@@ -542,7 +542,7 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	schema.AddQuery(&Field{
 		Name: "albums",
 		Type: ConnectionObject{Of: albumObject},
-		Resolver: &connectionResolver{
+		Resolver: &collectionResolver{
 			Collection: &dal.AlbumsView.Collection,
 			Type:       db.Album{},
 			SortableFields: []string{
