@@ -170,9 +170,9 @@ update msg model =
                         ++ albumTracks
             in
                 ( { model
-                    | artists = artists
-                    , albums = albums
-                    , tracks = tracks
+                    | artists = artists |> List.take 20
+                    , albums = albums |> List.take 20
+                    , tracks = tracks |> List.take 20
                   }
                 , Cmd.none
                 , Nothing
