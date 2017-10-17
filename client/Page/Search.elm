@@ -9,6 +9,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Task exposing (Task)
 import Api
+import View.AlbumGrid
 
 
 -- Model
@@ -29,6 +30,7 @@ artistSpec =
 type alias Album =
     { id : String
     , name : String
+    , imageId : Maybe String
     , artistName : String
     }
 
@@ -41,6 +43,7 @@ albumSpec =
         GraphQL.object Album
             |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
             |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.id))
             |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
 
 
@@ -116,8 +119,17 @@ update msg model =
 
                 artists =
                     extractNodes results.artists
+
+                albums =
+                    extractNodes results.albums
             in
-                ( { model | artists = Debug.log "artists " artists }, Cmd.none, Nothing )
+                ( { model
+                    | artists = artists
+                    , albums = albums
+                  }
+                , Cmd.none
+                , Nothing
+                )
 
         GotResults (Err err) ->
             ( model, Cmd.none, Nothing )
@@ -143,10 +155,18 @@ viewArtistResults artists =
         ]
 
 
+viewAlbumResults albums =
+    div []
+        [ div [ class "h1 bold" ] [ text "Albums" ]
+        , View.AlbumGrid.view SearchInput albums
+        ]
+
+
 view model =
     div []
         [ Html.form [ onSubmit DoSearch ]
             [ input [ type_ "text", onInput SearchInput, value model.searchField ] []
             ]
         , viewArtistResults model.artists
+        , viewAlbumResults model.albums
         ]
