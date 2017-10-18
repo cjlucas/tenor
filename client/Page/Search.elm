@@ -240,17 +240,11 @@ viewArtist artist =
 
 
 viewArtistResults artists =
-    div []
-        [ div [ class "h1 bold" ] [ text "Artists" ]
-        , div [ class "flex flex-wrap" ] (List.map viewArtist artists)
-        ]
+    div [ class "flex flex-wrap" ] (List.map viewArtist artists)
 
 
 viewAlbumResults albums =
-    div []
-        [ div [ class "h1 bold" ] [ text "Albums" ]
-        , View.AlbumGrid.view SelectedAlbum albums
-        ]
+    View.AlbumGrid.view SelectedAlbum albums
 
 
 viewTrack track =
@@ -264,16 +258,23 @@ viewTrack track =
 
 
 viewTrackResults tracks =
-    div []
-        [ div [ class "h1 bold" ] [ text "Tracks" ]
-        , div [ class "flex flex-wrap" ] (List.map viewTrack tracks)
-        ]
+    div [ class "flex flex-wrap" ] (List.map viewTrack tracks)
+
+
+viewResultSection sectionName view elements =
+    if List.length elements > 0 then
+        div []
+            [ div [ class "h1 bold pt2 pb2" ] [ text sectionName ]
+            , view elements
+            ]
+    else
+        text ""
 
 
 view model =
-    div [ class "full-height-scrollable" ]
+    div [ class "full-height-scrollable pl4 pr4 mx-auto" ]
         [ View.AlbumModal.view DismissModal NoOp SelectedAlbumTrack model.selectedAlbum
-        , viewArtistResults model.artists
-        , viewAlbumResults model.albums
-        , viewTrackResults model.tracks
+        , viewResultSection "Artists" viewArtistResults model.artists
+        , viewResultSection "Albums" viewAlbumResults model.albums
+        , viewResultSection "Tracks" viewTrackResults model.tracks
         ]
