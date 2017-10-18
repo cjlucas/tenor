@@ -222,9 +222,9 @@ processSearchResults results model =
             (extractNodes results.tracks)
                 ++ albumTracks
     in
-        { artists = artists |> List.take 20
-        , albums = albums |> List.take 20
-        , tracks = tracks |> List.take 20
+        { artists = artists |> List.Extra.uniqueBy .id |> List.take 20
+        , albums = albums |> List.Extra.uniqueBy .id |> List.take 20
+        , tracks = tracks |> List.Extra.uniqueBy .id |> List.take 20
         , selectedAlbum = Nothing
         }
 
