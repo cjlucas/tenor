@@ -1,4 +1,4 @@
-module Page.Search exposing (Model, Msg, OutMsg(..), init, update, search, view)
+module Page.Search exposing (Model, Msg, OutMsg(..), init, willAppear, didAppear, update, view)
 
 import GraphQL.Request.Builder as GraphQL
 import GraphQL.Client.Http
@@ -98,8 +98,7 @@ trackSpec =
 
 
 type alias Model =
-    { searchField : String
-    , artists : List Artist
+    { artists : List Artist
     , albums : List Album
     , tracks : List Track
     , selectedAlbum : Maybe Album
@@ -115,12 +114,27 @@ type alias SearchResults =
 
 
 init =
-    { searchField = ""
-    , artists = []
+    { artists = []
     , albums = []
     , tracks = []
     , selectedAlbum = Nothing
     }
+
+
+willAppear : String -> Model -> Task GraphQL.Client.Http.Error Model
+willAppear query model =
+    let
+        processSearchResultsTask results =
+            Task.succeed <| processSearchResults results model
+    in
+        Api.search query artistSpec albumSpec trackSpec
+            |> Api.sendRequest
+            |> Task.andThen processSearchResultsTask
+
+
+didAppear : Model -> ( Model, Cmd Msg )
+didAppear model =
+    ( model, Cmd.none )
 
 
 
@@ -135,8 +149,6 @@ type OutMsg
 type Msg
     = NoOp
     | DismissModal
-    | SearchInput String
-    | GotResults (Result GraphQL.Client.Http.Error SearchResults)
     | SelectedArtist String
     | SelectedAlbum String
     | SelectedAlbumTrack String
@@ -145,42 +157,6 @@ type Msg
 
 update msg model =
     case Debug.log "SEARCH MSG" msg of
-        SearchInput s ->
-            ( { model | searchField = s }, Cmd.none, Nothing )
-
-        GotResults (Ok results) ->
-            let
-                extractNodes =
-                    (List.map .node) << .edges
-
-                artists =
-                    extractNodes results.artists
-
-                albums =
-                    (extractNodes results.albums)
-                        ++ (List.concatMap .albums artists)
-
-                albumTracks =
-                    albums
-                        |> List.concatMap .discs
-                        |> List.concatMap .tracks
-
-                tracks =
-                    (extractNodes results.tracks)
-                        ++ albumTracks
-            in
-                ( { model
-                    | artists = artists |> List.take 20
-                    , albums = albums |> List.take 20
-                    , tracks = tracks |> List.take 20
-                  }
-                , Cmd.none
-                , Nothing
-                )
-
-        GotResults (Err err) ->
-            ( model, Cmd.none, Nothing )
-
         SelectedArtist id ->
             ( model, Cmd.none, Just (ChoseArtist id) )
 
@@ -224,21 +200,33 @@ update msg model =
             ( model, Cmd.none, Nothing )
 
 
-search : String -> Model -> ( Model, Cmd Msg )
-search query model =
+processSearchResults : SearchResults -> Model -> Model
+processSearchResults results model =
     let
-        cmd =
-            Api.search query artistSpec albumSpec trackSpec
-                |> Api.sendRequest
-                |> Task.attempt GotResults
+        extractNodes =
+            (List.map .node) << .edges
+
+        artists =
+            extractNodes results.artists
+
+        albums =
+            (extractNodes results.albums)
+                ++ (List.concatMap .albums artists)
+
+        albumTracks =
+            albums
+                |> List.concatMap .discs
+                |> List.concatMap .tracks
+
+        tracks =
+            (extractNodes results.tracks)
+                ++ albumTracks
     in
-        ( { model
-            | artists = []
-            , albums = []
-            , tracks = []
-          }
-        , cmd
-        )
+        { artists = artists |> List.take 20
+        , albums = albums |> List.take 20
+        , tracks = tracks |> List.take 20
+        , selectedAlbum = Nothing
+        }
 
 
 viewArtist artist =

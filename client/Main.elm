@@ -308,15 +308,12 @@ update msg model =
 
         SearchSubmit ->
             let
-                ( pageState, cmd ) =
-                    Page.Search.search model.searchInput model.searchPageState
+                ( model_, cmd ) =
+                    loadPage Route.Search model
             in
-                ( { model
-                    | currentRoute = Route.Search
-                    , searchPageState = pageState
-                  }
+                ( model_
                 , Cmd.batch
-                    [ Cmd.map (PageMsg << SearchMsg) cmd
+                    [ cmd
                     , Dom.blur "search" |> Task.attempt DomAction
                     ]
                 )
@@ -355,7 +352,8 @@ loadPage route model =
                         |> Task.map Albums
 
                 Route.Search ->
-                    Task.map Search <| Task.succeed model.searchPageState
+                    Page.Search.willAppear model.searchInput model.searchPageState
+                        |> Task.map Search
 
         cmd =
             Task.attempt ShowPage task
@@ -389,7 +387,10 @@ pageDidAppear page =
                     pageModel
 
             Search pageModel ->
-                ( page, Cmd.none )
+                didAppear Search
+                    SearchMsg
+                    Page.Search.didAppear
+                    pageModel
 
 
 updatePage : PageMsg -> Model -> ( Model, Cmd Msg )
