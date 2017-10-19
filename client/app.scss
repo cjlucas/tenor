@@ -209,3 +209,18 @@ scrollable view, one can be created with a height of 100%.
 .dim {
   color: rgba(74, 74, 74, .7);
 }
+
+input[type=text] {
+    font: 1em 'AvenirNext';
+}
+
+.search {
+    color: #4A4A4A;
+    border: 1.0px solid #4A4A4A;
+    outline: none;
+    border-radius: 8px;
+    padding-left: 30px;
+}
+.search:focus {
+    border: 1.0px solid #18C29C;
+}
