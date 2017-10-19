@@ -35,12 +35,18 @@ viewAlbum onClickMsg album =
 
 view onClickMsg albums =
     div
-        [ class "flex flex-wrap mbn3"
+        [ class "flex flex-wrap"
 
         {- Add negative spacing to counter-act the margin-bottom placed
            on the individual items. This gives us the effect of vertical
            spacing between rows, without the extra spacing below the grid.
+
+           Similarly, we do the same for left and right padding.
         -}
-        , style [ ( "margin-bottom", "-2rem" ) ]
+        , style
+            [ ( "margin-bottom", "-2rem" )
+            , ( "margin-left", "-1rem" )
+            , ( "margin-right", "-1rem" )
+            ]
         ]
         (List.map (viewAlbum onClickMsg) albums)
