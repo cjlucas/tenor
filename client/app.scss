@@ -210,12 +210,17 @@ scrollable view, one can be created with a height of 100%.
   color: rgba(74, 74, 74, .7);
 }
 
+input[type=text] {
+    font: 1em 'AvenirNext';
+}
+
 .search {
-    color: rgba(151, 151, 151, .70);
-    border: 1px solid rgba(151, 151, 151, .25);
+    color: #4A4A4A;
+    border: 1.0px solid #4A4A4A;
     outline: none;
+    border-radius: 8px;
+    padding-left: 30px;
 }
 .search:focus {
-    color: #4A4A4A;
-    border: 1px solid #18C29C;
+    border: 1.0px solid #18C29C;
 }

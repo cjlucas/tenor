@@ -230,7 +230,7 @@ processSearchResults results model =
 
 
 viewArtist artist =
-    div [ class "col sm-col-12 md-col-6 lg-col-4" ]
+    div [ class "col sm-col-12 md-col-6 lg-col-3" ]
         [ div
             [ class "mr4 h3 bold pointer border-bottom pt2 pb2 pr2"
             , onClick (SelectedArtist artist.id)
@@ -244,17 +244,33 @@ viewArtistResults artists =
 
 
 viewAlbumResults albums =
-    View.AlbumGrid.view SelectedAlbum albums
+    div [ class "pt2" ]
+        [ View.AlbumGrid.view SelectedAlbum albums
+        ]
 
 
 viewTrack track =
-    div [ class "col sm-col-12 md-col-6 lg-col-4" ]
-        [ div
-            [ class "mr4 h3 bold pointer border-bottom pt2 pb2 pr2"
-            , onClick (SelectedTrack track.id)
+    let
+        imageUrl =
+            case track.imageId of
+                Just id ->
+                    "/image/" ++ id
+
+                Nothing ->
+                    "/static/images/missing_artwork.svg"
+    in
+        div [ class "col sm-col-12 md-col-6 lg-col-4" ]
+            [ div
+                [ class "flex mr4 pointer border-bottom pt2 pb1 pr2"
+                , onClick (SelectedTrack track.id)
+                ]
+                [ img [ class "fit pr1", src imageUrl, style [ ( "height", "60px" ) ] ] []
+                , div [ class "flex-auto" ]
+                    [ div [ class "h4 bold pb1" ] [ text track.name ]
+                    , div [ class "h4" ] [ text track.artistName ]
+                    ]
+                ]
             ]
-            [ text track.name ]
-        ]
 
 
 viewTrackResults tracks =
@@ -263,8 +279,8 @@ viewTrackResults tracks =
 
 viewResultSection sectionName view elements =
     if List.length elements > 0 then
-        div []
-            [ div [ class "h1 bold pt2 pb2" ] [ text sectionName ]
+        div [ class "pt2" ]
+            [ div [ class "h1 bold pt2 pb1 mb2 border-bottom" ] [ text sectionName ]
             , view elements
             ]
     else
