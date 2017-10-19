@@ -511,27 +511,45 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	schema := NewSchema()
 
 	schema.AddQuery(&Field{
-		Name:     "searchArtists",
-		Type:     ListObject{Of: artistObject},
-		Resolver: newSearchResolver(dal, &dal.AlbumArtists.Collection, db.Artist{}),
+		Name: "searchArtists",
+		Type: ConnectionObject{Of: artistObject},
+		Resolver: &searchResolver{
+			Collection:       &dal.AlbumArtists.Collection,
+			SortableFields:   []string{"name"},
+			DefaultSortField: "name",
+			Type:             db.Artist{},
+			Trie:             buildSearchTrie(dal, &dal.AlbumArtists.Collection, db.Artist{}),
+		},
 	})
 
 	schema.AddQuery(&Field{
-		Name:     "searchAlbums",
-		Type:     ListObject{Of: albumObject},
-		Resolver: newSearchResolver(dal, &dal.Albums.Collection, db.Album{}),
+		Name: "searchAlbums",
+		Type: ConnectionObject{Of: albumObject},
+		Resolver: &searchResolver{
+			Collection:       &dal.Albums.Collection,
+			SortableFields:   []string{"name"},
+			DefaultSortField: "name",
+			Type:             db.Album{},
+			Trie:             buildSearchTrie(dal, &dal.Albums.Collection, db.Album{}),
+		},
 	})
 
 	schema.AddQuery(&Field{
-		Name:     "searchTracks",
-		Type:     ListObject{Of: trackObject},
-		Resolver: newSearchResolver(dal, &dal.Tracks.Collection, db.Track{}),
+		Name: "searchTracks",
+		Type: ConnectionObject{Of: trackObject},
+		Resolver: &searchResolver{
+			Collection:       &dal.Tracks.Collection,
+			SortableFields:   []string{"name"},
+			DefaultSortField: "name",
+			Type:             db.Track{},
+			Trie:             buildSearchTrie(dal, &dal.Tracks.Collection, db.Track{}),
+		},
 	})
 
 	schema.AddQuery(&Field{
 		Name: "artists",
 		Type: ConnectionObject{Of: artistObject},
-		Resolver: &connectionResolver{
+		Resolver: &collectionResolver{
 			Collection:       &dal.AlbumArtists.Collection,
 			Type:             db.Artist{},
 			SortableFields:   []string{"name"},
@@ -542,7 +560,7 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 	schema.AddQuery(&Field{
 		Name: "albums",
 		Type: ConnectionObject{Of: albumObject},
-		Resolver: &connectionResolver{
+		Resolver: &collectionResolver{
 			Collection: &dal.AlbumsView.Collection,
 			Type:       db.Album{},
 			SortableFields: []string{

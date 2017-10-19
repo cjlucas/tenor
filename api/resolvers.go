@@ -30,7 +30,7 @@ type cursor struct {
 	ID        string
 }
 
-type connectionResolver struct {
+type collectionResolver struct {
 	// Configuration
 	Collection       *db.Collection
 	Type             interface{}
@@ -45,7 +45,7 @@ type connectionResolver struct {
 	Descending bool   `args:"descending"`
 }
 
-func (r *connectionResolver) validSortableField() bool {
+func (r *collectionResolver) validSortableField() bool {
 	for _, field := range r.SortableFields {
 		if r.OrderBy == field {
 			return true
@@ -55,7 +55,7 @@ func (r *connectionResolver) validSortableField() bool {
 	return false
 }
 
-func (r *connectionResolver) encodeCursor(obj interface{}) string {
+func (r *collectionResolver) encodeCursor(obj interface{}) string {
 	value := reflect.ValueOf(obj)
 	var val string
 	switch r.OrderBy {
@@ -83,7 +83,7 @@ func (r *connectionResolver) encodeCursor(obj interface{}) string {
 	return cursor
 }
 
-func (r *connectionResolver) decodeCursor(s string) (*cursor, error) {
+func (r *collectionResolver) decodeCursor(s string) (*cursor, error) {
 	buf, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return nil, errors.New("error decoding cursor")
@@ -109,7 +109,7 @@ func (r *connectionResolver) decodeCursor(s string) (*cursor, error) {
 	return &cursor{SortField: parts[0], SortValue: val, ID: parts[2]}, nil
 }
 
-func (r *connectionResolver) Resolve(ctx context.Context) (*Connection, error) {
+func (r *collectionResolver) Resolve(ctx context.Context) (*Connection, error) {
 	if r.First > 500 {
 		r.First = 500
 	}
@@ -238,14 +238,23 @@ func (r *instanceCountResolver) Resolve(ctx context.Context, artist *db.Artist) 
 }
 
 type searchResolver struct {
-	Collection *db.Collection
-	Type       interface{}
-	Trie       *trie.Trie
+	// Configuration
+	Collection       *db.Collection
+	SortableFields   []string
+	DefaultSortField string
+	Type             interface{}
+	Trie             *trie.Trie
 
-	Query string `args:"query"`
+	// Parameters
+	Query      string `args:"query"`
+	First      int    `args:"first"`
+	Before     string `args:"before"`
+	After      string `args:"after"`
+	OrderBy    string `args:"orderBy"`
+	Descending bool   `args:"descending"`
 }
 
-func newSearchResolver(db *db.DB, coll *db.Collection, model interface{}) *searchResolver {
+func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *trie.Trie {
 	modelType := reflect.TypeOf(model)
 	for modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
@@ -269,17 +278,10 @@ func newSearchResolver(db *db.DB, coll *db.Collection, model interface{}) *searc
 
 	rows.Close()
 
-	return &searchResolver{
-		Collection: coll,
-		Type:       model,
-		Trie:       t,
-	}
+	return t
 }
 
 func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
-	sliceType := reflect.SliceOf(reflect.TypeOf(r.Type))
-	emptySlice := reflect.MakeSlice(sliceType, 0, 0).Interface()
-
 	var result *trie.LookupResult
 	for _, s := range strings.Split(r.Query, " ") {
 		res := r.Trie.Lookup(strings.TrimSpace(s))
@@ -291,17 +293,18 @@ func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
 	}
 
 	ids := result.ToSlice()
+	resolver := &collectionResolver{
+		Collection:       r.Collection.Where("id IN (?)", ids),
+		Type:             r.Type,
+		SortableFields:   []string{"name"},
+		DefaultSortField: "name",
 
-	if len(ids) == 0 {
-		return emptySlice, nil
+		First:      r.First,
+		Before:     r.Before,
+		After:      r.After,
+		OrderBy:    r.OrderBy,
+		Descending: r.Descending,
 	}
 
-	out := reflect.New(sliceType)
-	r.Collection.Where("id IN (?)", ids).All(out.Interface())
-
-	if out.IsNil() || out.Elem().Len() == 0 {
-		return emptySlice, nil
-	}
-
-	return out.Elem().Interface(), nil
+	return resolver.Resolve(ctx)
 }
