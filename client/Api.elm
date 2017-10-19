@@ -8,7 +8,7 @@ import Task exposing (Task)
 
 
 type alias Connection a =
-    { endCursor : String
+    { endCursor : Maybe String
     , edges : List (Edge a)
     }
 
@@ -25,7 +25,7 @@ connectionSpec nodeName spec =
                 |> with (field nodeName [] spec)
     in
         GraphQL.object Connection
-            |> with (field "endCursor" [] string)
+            |> with (field "endCursor" [] (nullable string))
             |> with (field "edges" [] (list edgeSpec))
 
 
@@ -161,3 +161,37 @@ getAlbum id outSpec =
                 )
     in
         Query docSpec args
+
+
+type alias SearchResults artist album track =
+    { artists : Connection artist
+    , albums : Connection album
+    , tracks : Connection track
+    }
+
+
+search query artistSpec albumSpec trackSpec =
+    let
+        queryArg =
+            Var.required "query" .query Var.string
+
+        firstArg =
+            Var.required "first" .first Var.int
+
+        searchSpec queryName specName spec =
+            GraphQL.field queryName
+                [ ( "query", Arg.variable queryArg )
+                , ( "first", Arg.variable firstArg )
+                ]
+                (connectionSpec specName spec)
+
+        outSpec =
+            object SearchResults
+                |> with (searchSpec "searchArtists" "artist" artistSpec)
+                |> with (searchSpec "searchAlbums" "album" albumSpec)
+                |> with (searchSpec "searchTracks" "track" trackSpec)
+
+        args =
+            { query = query, first = 20 }
+    in
+        Query outSpec args
