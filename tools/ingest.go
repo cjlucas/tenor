@@ -463,18 +463,24 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 
 		}
 
-		track := db.Track{
-			FileID:              file.ID,
-			ImageID:             imageID,
-			Name:                trackInfo.TrackName,
-			Position:            trackInfo.TrackPosition,
-			TotalTracks:         trackInfo.TotalTracks,
-			Duration:            trackInfo.Duration,
-			ReleaseDate:         trackInfo.ReleaseDate,
-			OriginalReleaseDate: trackInfo.OriginalReleaseDate,
-		}
+		var track db.Track
+		// TODO: Consider batch fetching these tracks
+		s.db.Tracks.Where("file_id = ?", file.ID).One(&track)
 
-		s.db.Tracks.Create(&track)
+		track.FileID = file.ID
+		track.ImageID = imageID
+		track.Name = trackInfo.TrackName
+		track.Position = trackInfo.TrackPosition
+		track.TotalTracks = trackInfo.TotalTracks
+		track.Duration = trackInfo.Duration
+		track.ReleaseDate = trackInfo.ReleaseDate
+		track.OriginalReleaseDate = trackInfo.OriginalReleaseDate
+
+		if track.ID != "" {
+			s.db.Tracks.Update(&track)
+		} else {
+			s.db.Tracks.Create(&track)
+		}
 
 		trackArtistKey := artistKey{Name: trackInfo.ArtistName}
 		s.artistCacne[trackArtistKey] = append(s.artistCacne[trackArtistKey], track.ID)

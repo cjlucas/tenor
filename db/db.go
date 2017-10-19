@@ -118,6 +118,10 @@ func (c *Collection) Create(val interface{}) error {
 	return c.db.wrapErrors(c.db.db.Create(val))
 }
 
+func (c *Collection) Update(val interface{}) error {
+	return c.db.wrapErrors(c.db.db.Save(val))
+}
+
 func (c *Collection) FirstOrCreate(query interface{}, val interface{}) error {
 	return c.db.wrapErrors(c.db.db.FirstOrCreate(val, query))
 }
