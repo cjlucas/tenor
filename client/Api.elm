@@ -178,18 +178,18 @@ search query artistSpec albumSpec trackSpec =
         firstArg =
             Var.required "first" .first Var.int
 
-        searchSpec queryName spec =
+        searchSpec queryName specName spec =
             GraphQL.field queryName
                 [ ( "query", Arg.variable queryArg )
                 , ( "first", Arg.variable firstArg )
                 ]
-                spec
+                (connectionSpec specName spec)
 
         outSpec =
             object SearchResults
-                |> with (searchSpec "searchArtists" (connectionSpec "artist" artistSpec))
-                |> with (searchSpec "searchAlbums" (connectionSpec "album" albumSpec))
-                |> with (searchSpec "searchTracks" (connectionSpec "track" trackSpec))
+                |> with (searchSpec "searchArtists" "artist" artistSpec)
+                |> with (searchSpec "searchAlbums" "album" albumSpec)
+                |> with (searchSpec "searchTracks" "track" trackSpec)
 
         args =
             { query = query, first = 20 }

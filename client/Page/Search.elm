@@ -156,7 +156,7 @@ type Msg
 
 
 update msg model =
-    case Debug.log "SEARCH MSG" msg of
+    case msg of
         SelectedArtist id ->
             ( model, Cmd.none, Just (ChoseArtist id) )
 

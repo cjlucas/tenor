@@ -296,8 +296,8 @@ func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
 	resolver := &collectionResolver{
 		Collection:       r.Collection.Where("id IN (?)", ids),
 		Type:             r.Type,
-		SortableFields:   []string{"name"},
-		DefaultSortField: "name",
+		SortableFields:   r.SortableFields,
+		DefaultSortField: r.DefaultSortField,
 
 		First:      r.First,
 		Before:     r.Before,
