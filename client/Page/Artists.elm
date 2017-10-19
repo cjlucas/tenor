@@ -1,4 +1,4 @@
-module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, didAppear, update, view)
+module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, didAppear, update, selectArtist, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -297,12 +297,10 @@ update msg model =
     case msg of
         SelectedArtist id ->
             let
-                cmd =
-                    (Api.getArtist id artistSpec)
-                        |> Api.sendRequest
-                        |> Task.attempt GotArtist
+                ( model_, cmd ) =
+                    selectArtist id model
             in
-                ( setInfiniteScrollLoadFunc noopLoadMore model, cmd, Nothing )
+                ( model_, cmd, Nothing )
 
         GotArtist (Ok artist) ->
             let
@@ -375,10 +373,21 @@ update msg model =
             ( model, Cmd.none, Nothing )
 
 
+selectArtist : String -> Model -> ( Model, Cmd Msg )
+selectArtist id model =
+    let
+        cmd =
+            (Api.getArtist id artistSpec)
+                |> Api.sendRequest
+                |> Task.attempt GotArtist
+    in
+        ( setInfiniteScrollLoadFunc noopLoadMore model, cmd )
+
+
 loadArtistsTask maybeCursor =
     let
         limit =
-            20
+            10
 
         spec =
             Api.connectionSpec "artist" artistSpec
@@ -395,9 +404,18 @@ noopLoadMore direction =
 
 
 handleLoadArtistsResponse connection model =
-    model
-        |> addSelectedArtists (List.map .node connection.edges)
-        |> setInfiniteScrollLoadFunc (loadArtists (Just connection.endCursor))
+    let
+        loadMoreCmd =
+            case connection.endCursor of
+                Just cursor ->
+                    loadArtists (Just cursor)
+
+                Nothing ->
+                    noopLoadMore
+    in
+        model
+            |> addSelectedArtists (List.map .node connection.edges)
+            |> setInfiniteScrollLoadFunc loadMoreCmd
 
 
 

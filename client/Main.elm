@@ -13,7 +13,9 @@ import Json.Decode as Decode
 import List.Extra
 import Page.Artists
 import Page.Albums
+import Page.Search
 import Route exposing (Route)
+import Dom
 
 
 streamUrl id =
@@ -157,6 +159,7 @@ type alias Track =
 type Page
     = Artists Page.Artists.Model
     | Albums Page.Albums.Model
+    | Search Page.Search.Model
 
 
 type PageState
@@ -168,8 +171,10 @@ type alias Model =
     { player : Player
     , pageState : PageState
     , currentRoute : Route
+    , searchInput : String
     , artistsPageState : Page.Artists.Model
     , albumsPageState : Page.Albums.Model
+    , searchPageState : Page.Search.Model
     }
 
 
@@ -182,6 +187,9 @@ setPageState page model =
         Albums pageModel ->
             { model | albumsPageState = pageModel }
 
+        Search pageModel ->
+            { model | searchPageState = pageModel }
+
 
 
 -- Init
@@ -193,8 +201,10 @@ init =
             { player = defaultPlayer
             , pageState = PageLoaded
             , currentRoute = Route.Artists
+            , searchInput = ""
             , artistsPageState = Page.Artists.init
             , albumsPageState = Page.Albums.init
+            , searchPageState = Page.Search.init
             }
     in
         loadPage Route.Artists model
@@ -218,6 +228,7 @@ type PlayerEvent
 type PageMsg
     = ArtistsMsg Page.Artists.Msg
     | AlbumsMsg Page.Albums.Msg
+    | SearchMsg Page.Search.Msg
 
 
 type Msg
@@ -229,6 +240,10 @@ type Msg
     | TogglePlayPause
     | PlayNext
     | PlayPrevious
+    | SearchFocus
+    | SearchInput String
+    | SearchSubmit
+    | DomAction (Result Dom.Error ())
 
 
 update msg model =
@@ -285,6 +300,27 @@ update msg model =
             in
                 ( { model | player = player }, cmd )
 
+        SearchFocus ->
+            ( { model | searchInput = "" }, Cmd.none )
+
+        SearchInput s ->
+            ( { model | searchInput = s }, Cmd.none )
+
+        SearchSubmit ->
+            let
+                ( model_, cmd ) =
+                    loadPage Route.Search model
+            in
+                ( model_
+                , Cmd.batch
+                    [ cmd
+                    , Dom.blur "search" |> Task.attempt DomAction
+                    ]
+                )
+
+        DomAction _ ->
+            update NoOp model
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -315,6 +351,10 @@ loadPage route model =
                         |> Maybe.withDefault (Task.succeed model.albumsPageState)
                         |> Task.map Albums
 
+                Route.Search ->
+                    Page.Search.willAppear model.searchInput model.searchPageState
+                        |> Task.map Search
+
         cmd =
             Task.attempt ShowPage task
     in
@@ -344,6 +384,12 @@ pageDidAppear page =
                 didAppear Albums
                     AlbumsMsg
                     Page.Albums.didAppear
+                    pageModel
+
+            Search pageModel ->
+                didAppear Search
+                    SearchMsg
+                    Page.Search.didAppear
                     pageModel
 
 
@@ -391,6 +437,41 @@ updatePage msg model =
                         ]
             in
                 ( { model_ | albumsPageState = pageModel_ }, cmd )
+
+        SearchMsg msg ->
+            let
+                ( pageModel, pageCmd, outMsg ) =
+                    Page.Search.update msg model.searchPageState
+
+                ( model_, cmd ) =
+                    case outMsg of
+                        Just (Page.Search.ChoseArtist id) ->
+                            let
+                                ( artistsState, cmd ) =
+                                    Page.Artists.selectArtist id model.artistsPageState
+                            in
+                                ( { model
+                                    | currentRoute = Route.Artists
+                                    , artistsPageState = artistsState
+                                  }
+                                , Cmd.map (PageMsg << ArtistsMsg) cmd
+                                )
+
+                        Just (Page.Search.PlayTracks tracks) ->
+                            resetPlayerWithTracks tracks model
+
+                        Nothing ->
+                            ( model, Cmd.none )
+
+                batchCmd =
+                    Cmd.batch
+                        [ Cmd.map (PageMsg << SearchMsg) pageCmd
+                        , cmd
+                        ]
+            in
+                ( { model_ | searchPageState = pageModel }
+                , batchCmd
+                )
 
 
 playNextTrack : Player -> ( Player, Cmd Msg )
@@ -616,12 +697,14 @@ viewNowPlaying player =
                 text ""
 
 
-viewHeader player =
+viewHeader model =
     let
+        player =
+            model.player
+
         viewItems =
             [ ( "Artists", Route.Artists )
             , ( "Albums", Route.Albums )
-            , ( "Up Next", Route.Artists )
             ]
                 |> List.map
                     (\( item, pageNmae ) ->
@@ -630,7 +713,32 @@ viewHeader player =
                     )
 
         viewMenu =
-            ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
+            div []
+                [ ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
+                , Html.form [ class "inline-block", onSubmit SearchSubmit ]
+                    [ div [ class "inline-block", style [ ( "position", "relative" ) ] ]
+                        [ i
+                            [ class "fa fa-search"
+                            , style
+                                [ ( "position", "absolute" )
+                                , ( "top", "10px" )
+                                , ( "left", "10px" )
+                                ]
+                            ]
+                            []
+                        , input
+                            [ id "search"
+                            , class "search p1"
+                            , type_ "text"
+                            , onInput SearchInput
+                            , on "focus" (Decode.succeed SearchFocus)
+                            , placeholder "Search"
+                            , value model.searchInput
+                            ]
+                            []
+                        ]
+                    ]
+                ]
     in
         div [ class "header flex pl1 pr1 justify-between items-center border-bottom" ]
             [ div [ class "flex items-center pl2" ]
@@ -654,6 +762,9 @@ viewPage model =
                 Route.Albums ->
                     Html.map AlbumsMsg <| Page.Albums.view model.albumsPageState
 
+                Route.Search ->
+                    Html.map SearchMsg <| Page.Search.view model.searchPageState
+
 
 viewPageFrame model =
     div [ class "main" ]
@@ -665,6 +776,6 @@ viewPageFrame model =
 
 view model =
     div [ class "viewport" ]
-        [ viewHeader model.player
+        [ viewHeader model
         , Html.map PageMsg <| viewPageFrame model
         ]
