@@ -715,16 +715,28 @@ viewHeader model =
         viewMenu =
             div []
                 [ ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
-                , Html.form [ class "inline", onSubmit SearchSubmit ]
-                    [ input
-                        [ id "search"
-                        , class "search p1"
-                        , type_ "text"
-                        , onInput SearchInput
-                        , on "focus" (Decode.succeed SearchFocus)
-                        , value model.searchInput
+                , Html.form [ class "inline-block", onSubmit SearchSubmit ]
+                    [ div [ class "inline-block", style [ ( "position", "relative" ) ] ]
+                        [ i
+                            [ class "fa fa-search"
+                            , style
+                                [ ( "position", "absolute" )
+                                , ( "top", "10px" )
+                                , ( "left", "10px" )
+                                ]
+                            ]
+                            []
+                        , input
+                            [ id "search"
+                            , class "search p1"
+                            , type_ "text"
+                            , onInput SearchInput
+                            , on "focus" (Decode.succeed SearchFocus)
+                            , placeholder "Search"
+                            , value model.searchInput
+                            ]
+                            []
                         ]
-                        []
                     ]
                 ]
     in
