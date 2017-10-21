@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cjlucas/tenor/db"
-	"github.com/cjlucas/tenor/trie"
+	"github.com/cjlucas/tenor/search"
 	"github.com/nicksrandall/dataloader"
 )
 
@@ -243,7 +243,7 @@ type searchResolver struct {
 	SortableFields   []string
 	DefaultSortField string
 	Type             interface{}
-	Trie             *trie.Trie
+	Trie             *search.Trie
 
 	// Parameters
 	Query      string `args:"query"`
@@ -254,13 +254,13 @@ type searchResolver struct {
 	Descending bool   `args:"descending"`
 }
 
-func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *trie.Trie {
+func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *search.Trie {
 	modelType := reflect.TypeOf(model)
 	for modelType.Kind() == reflect.Ptr {
 		modelType = modelType.Elem()
 	}
 
-	t := trie.New()
+	t := search.NewTrie()
 	rows, _ := coll.Rows()
 
 	for rows.Next() {
@@ -282,7 +282,7 @@ func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *trie.Tr
 }
 
 func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
-	var result *trie.LookupResult
+	var result *search.LookupResult
 	for _, s := range strings.Split(r.Query, " ") {
 		res := r.Trie.Lookup(strings.TrimSpace(s))
 		if result == nil {
