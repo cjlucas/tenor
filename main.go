@@ -9,6 +9,7 @@ import (
 
 	"github.com/cjlucas/tenor/api"
 	"github.com/cjlucas/tenor/db"
+	"github.com/cjlucas/tenor/search"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -20,7 +21,9 @@ func main() {
 		panic(err)
 	}
 
-	schema, err := api.LoadSchema(dal)
+	searchService := search.NewService(dal)
+
+	schema, err := api.LoadSchema(dal, searchService)
 	if err != nil {
 		panic(err)
 	}

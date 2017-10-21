@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/cjlucas/tenor/db"
-	"github.com/cjlucas/tenor/search"
 	"github.com/nicksrandall/dataloader"
 )
 
@@ -240,10 +239,10 @@ func (r *instanceCountResolver) Resolve(ctx context.Context, artist *db.Artist) 
 type searchResolver struct {
 	// Configuration
 	Collection       *db.Collection
+	SearchFunc       func(string) []string
 	SortableFields   []string
 	DefaultSortField string
 	Type             interface{}
-	Trie             *search.Trie
 
 	// Parameters
 	Query      string `args:"query"`
@@ -254,45 +253,9 @@ type searchResolver struct {
 	Descending bool   `args:"descending"`
 }
 
-func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *search.Trie {
-	modelType := reflect.TypeOf(model)
-	for modelType.Kind() == reflect.Ptr {
-		modelType = modelType.Elem()
-	}
-
-	t := search.NewTrie()
-	rows, _ := coll.Rows()
-
-	for rows.Next() {
-		val := reflect.New(modelType).Elem()
-		db.ScanRows(rows, val.Addr().Interface())
-
-		id := val.FieldByIndex([]int{0, 0}).Interface().(string)
-		name := val.FieldByName("Name").Interface().(string)
-
-		for _, s := range strings.Split(name, " ") {
-			t.Add(strings.TrimSpace(s), id)
-
-		}
-	}
-
-	rows.Close()
-
-	return t
-}
-
 func (r *searchResolver) Resolve(ctx context.Context) (interface{}, error) {
-	var result *search.LookupResult
-	for _, s := range strings.Split(r.Query, " ") {
-		res := r.Trie.Lookup(strings.TrimSpace(s))
-		if result == nil {
-			result = res
-		} else {
-			result = result.Intersection(res)
-		}
-	}
+	ids := r.SearchFunc(r.Query)
 
-	ids := result.ToSlice()
 	resolver := &collectionResolver{
 		Collection:       r.Collection.Where("id IN (?)", ids),
 		Type:             r.Type,

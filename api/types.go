@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cjlucas/tenor/db"
+	"github.com/cjlucas/tenor/search"
 	"github.com/graphql-go/graphql"
 )
 
@@ -407,7 +408,7 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 	return out, nil
 }
 
-func LoadSchema(dal *db.DB) (*Schema, error) {
+func LoadSchema(dal *db.DB, searchService *search.Service) (*Schema, error) {
 	trackObject := NewObjectWithModel("Track", db.Track{})
 
 	discObject := NewObjectWithModel("Disc", db.Disc{})
@@ -515,10 +516,10 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Type: ConnectionObject{Of: artistObject},
 		Resolver: &searchResolver{
 			Collection:       &dal.AlbumArtists.Collection,
+			SearchFunc:       searchService.SearchArtists,
 			SortableFields:   []string{"name"},
 			DefaultSortField: "name",
 			Type:             db.Artist{},
-			Trie:             buildSearchTrie(dal, &dal.AlbumArtists.Collection, db.Artist{}),
 		},
 	})
 
@@ -527,10 +528,10 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Type: ConnectionObject{Of: albumObject},
 		Resolver: &searchResolver{
 			Collection:       &dal.Albums.Collection,
+			SearchFunc:       searchService.SearchAlbums,
 			SortableFields:   []string{"name"},
 			DefaultSortField: "name",
 			Type:             db.Album{},
-			Trie:             buildSearchTrie(dal, &dal.Albums.Collection, db.Album{}),
 		},
 	})
 
@@ -539,10 +540,10 @@ func LoadSchema(dal *db.DB) (*Schema, error) {
 		Type: ConnectionObject{Of: trackObject},
 		Resolver: &searchResolver{
 			Collection:       &dal.Tracks.Collection,
+			SearchFunc:       searchService.SearchTracks,
 			SortableFields:   []string{"name"},
 			DefaultSortField: "name",
 			Type:             db.Track{},
-			Trie:             buildSearchTrie(dal, &dal.Tracks.Collection, db.Track{}),
 		},
 	})
 
