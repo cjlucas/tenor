@@ -181,7 +181,6 @@ func NewScanner(dal *db.DB, artworkStore *artwork.Store) *Scanner {
 }
 
 func ScanFile(fpath string) (*trackMetadata, error) {
-	fmt.Println(fpath)
 	fp, err := os.Open(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("Error opening file: %s", err)
@@ -247,18 +246,25 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 		mdata := metadata[i]
 		file := inodeFileMap[mdata.Inode]
 
-		trackInfo, err := ScanFile(mdata.Path)
-		if err != nil {
-			continue
-		}
-
 		if file == nil {
 			file = &db.File{
 				Path:  mdata.Path,
 				Inode: mdata.Inode,
+				MTime: mdata.MTime,
 			}
 
 			s.db.Files.Create(file)
+		} else {
+			if mdata.MTime.Before(file.MTime) || mdata.MTime.Equal(file.MTime) {
+				continue
+			}
+
+			s.db.Files.Update(file)
+		}
+
+		trackInfo, err := ScanFile(mdata.Path)
+		if err != nil {
+			continue
 		}
 
 		var imageID string
