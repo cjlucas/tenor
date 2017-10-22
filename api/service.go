@@ -2,8 +2,8 @@ package api
 
 import (
 	"fmt"
-	"path"
 
+	"github.com/cjlucas/tenor/artwork"
 	"github.com/cjlucas/tenor/db"
 	"github.com/cjlucas/tenor/search"
 	"github.com/gin-contrib/cors"
@@ -12,12 +12,14 @@ import (
 
 type Service struct {
 	db            *db.DB
+	artworkStore  *artwork.Store
 	searchService *search.Service
 }
 
-func NewService(dal *db.DB, searchService *search.Service) *Service {
+func NewService(dal *db.DB, artworkStore *artwork.Store, searchService *search.Service) *Service {
 	return &Service{
 		db:            dal,
+		artworkStore:  artworkStore,
 		searchService: searchService,
 	}
 }
@@ -55,9 +57,7 @@ func (s *Service) Run() {
 		}
 		c.Header("Content-Type", dbImage.MIMEType)
 
-		fpath := path.Join(".images", string(dbImage.Checksum[0]), dbImage.Checksum)
-
-		fmt.Println(fpath)
+		fpath := s.artworkStore.ImagePath(dbImage.Checksum)
 		c.File(fpath)
 	})
 

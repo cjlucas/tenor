@@ -6,14 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/cjlucas/tenor/artwork"
 	"github.com/cjlucas/tenor/db"
 	"github.com/cjlucas/tenor/parsers"
 )
@@ -152,7 +151,8 @@ type discKey struct {
 }
 
 type Scanner struct {
-	db *db.DB
+	db           *db.DB
+	artworkStore *artwork.Store
 
 	artistCacne      map[artistKey][]string
 	albumArtistCache map[artistKey][]string
@@ -164,9 +164,11 @@ type Scanner struct {
 	discModel  map[discKey]db.Disc
 }
 
-func NewScanner(dal *db.DB) *Scanner {
+func NewScanner(dal *db.DB, artworkStore *artwork.Store) *Scanner {
 	return &Scanner{
-		db:               dal,
+		db:           dal,
+		artworkStore: artworkStore,
+
 		artistCacne:      make(map[artistKey][]string),
 		albumArtistCache: make(map[artistKey][]string),
 		albumCache:       make(map[albumKey][]string),
@@ -283,11 +285,7 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 					imageID = image.ID
 					s.imageCache[csumStr] = imageID
 
-					dir := path.Join(".images", string(csumStr[0]))
-					os.MkdirAll(dir, 0777)
-
-					fpath := path.Join(dir, csumStr)
-					ioutil.WriteFile(fpath, img, 0777)
+					s.artworkStore.WriteImage(csumStr, img)
 				}
 			}
 
