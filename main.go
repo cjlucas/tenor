@@ -32,6 +32,10 @@ func main() {
 		Dir: "/Volumes/DATA1/music",
 	})
 
+	scannerService.RegisterProvider(&scanner.FSWatchProvider{
+		Dir: "/Volumes/DATA1/music",
+	})
+
 	searchService := search.NewService(dal)
 
 	apiService := api.NewService(dal, artworkStore, searchService)
