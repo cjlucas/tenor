@@ -18,6 +18,8 @@ import View.AlbumTracklist
 import Dom
 import Dom.Scroll
 import Json.Decode
+import View.AlbumGrid
+import View.AlbumModal
 
 
 -- Model
@@ -187,9 +189,17 @@ willAppear model =
                 |> Task.andThen
                     (\connection ->
                         let
+                            loadMoreCmd =
+                                case connection.endCursor of
+                                    Just cursor ->
+                                        loadAlbums model.sortOrder 50 (Just cursor)
+
+                                    Nothing ->
+                                        \_ -> Cmd.none
+
                             is =
                                 model.infiniteScroll
-                                    |> IS.loadMoreCmd (loadAlbums model.sortOrder 50 (Just connection.endCursor))
+                                    |> IS.loadMoreCmd loadMoreCmd
 
                             model_ =
                                 setAlbums (List.map .node connection.edges) model
@@ -284,10 +294,21 @@ update msg model =
 
         FetchedAlbums (Ok connection) ->
             let
+                -- Currently the backend doesn't declare that we've reached the
+                -- end of a list, so we use the side endCursor to determine
+                -- if we've hit the end.
+                loadMoreCmd =
+                    case connection.endCursor of
+                        Just cursor ->
+                            loadAlbums model.sortOrder 50 (Just cursor)
+
+                        Nothing ->
+                            \_ -> Cmd.none
+
                 is =
                     model.infiniteScroll
                         |> IS.stopLoading
-                        |> IS.loadMoreCmd (loadAlbums model.sortOrder 50 (Just connection.endCursor))
+                        |> IS.loadMoreCmd loadMoreCmd
 
                 model_ =
                     setAlbums (List.map .node connection.edges) model
@@ -368,70 +389,6 @@ update msg model =
 -- View
 
 
-albumUrl album =
-    case album.imageId of
-        Just id ->
-            "/image/" ++ id
-
-        Nothing ->
-            "/static/images/missing_artwork.svg"
-
-
-viewAlbum album =
-    let
-        albumImg =
-            img
-                [ style [ ( "width", "100%" ) ]
-                , src (albumUrl album)
-                ]
-                []
-    in
-        div [ class "col sm-col-6 md-col-3 lg-col-2 pl2 pr2 mb3 pointer", onClick (SelectedAlbum album.id) ]
-            [ div [ class "box" ] [ albumImg ]
-            , div [ class "h3 bold pt1" ] [ text album.name ]
-            , div [ class "h4" ] [ text album.artistName ]
-            ]
-
-
-onClickStopProp msg =
-    onWithOptions "click" { stopPropagation = True, preventDefault = False } (Json.Decode.succeed msg)
-
-
-viewModal : Maybe Album -> Html Msg
-viewModal album =
-    let
-        albumImg album =
-            img [ class "fit pr2", src (albumUrl album) ] []
-
-        viewContent =
-            case album of
-                Just album ->
-                    div [ class "modal-content p3", onClickStopProp NoOp ]
-                        [ div [ class "pb2" ]
-                            [ albumImg album
-                            , div [ class "flex-auto" ]
-                                [ div [ class "h1 pb1" ]
-                                    [ text album.name ]
-                                , div
-                                    [ class "h2 pb2" ]
-                                    [ text album.artistName ]
-                                ]
-                            ]
-                        , div [ class "overflow-scroll" ]
-                            [ View.AlbumTracklist.view SelectedTrack album
-                            ]
-                        ]
-
-                Nothing ->
-                    text ""
-    in
-        div
-            [ classList [ ( "modal", album /= Nothing ) ]
-            , onClick DismissModal
-            ]
-            [ viewContent ]
-
-
 viewHeader order =
     let
         buttons =
@@ -482,7 +439,7 @@ viewAlbumSection albums key =
     in
         div []
             [ div [ class "h1 bold pb3" ] [ text key ]
-            , div [ class "flex flex-wrap" ] (List.map viewAlbum albums_)
+            , View.AlbumGrid.view SelectedAlbum albums_
             ]
 
 
@@ -496,7 +453,7 @@ viewAlbums albums =
 
 view model =
     div []
-        [ viewModal model.selectedAlbum
+        [ View.AlbumModal.view DismissModal NoOp SelectedTrack model.selectedAlbum
         , div
             [ class "full-height-scrollable mx-auto"
             , id "viewport"
