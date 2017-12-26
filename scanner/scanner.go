@@ -254,11 +254,9 @@ func (s *Scanner) ScanBatch(fpaths []string) {
 			}
 
 			s.db.Files.Create(file)
-		} else {
-			if mdata.MTime.Before(file.MTime) || mdata.MTime.Equal(file.MTime) {
-				continue
-			}
-
+		} else if mdata.MTime.After(file.MTime) || mdata.Path != file.Path {
+			file.Path = mdata.Path
+			file.MTime = mdata.MTime
 			s.db.Files.Update(file)
 		}
 
