@@ -16,22 +16,15 @@ type Service struct {
 	searchService *search.Service
 }
 
-func NewService(dal *db.DB, artworkStore *artwork.Store, searchService *search.Service) *Service {
+func NewService(db *db.DB, artworkStore *artwork.Store, searchService *search.Service) *Service {
 	return &Service{
-		db:            dal,
+		db:            db,
 		artworkStore:  artworkStore,
 		searchService: searchService,
 	}
 }
 
 func (s *Service) Run() {
-	dal := s.db
-
-	schema, err := LoadSchema(dal, s.searchService)
-	if err != nil {
-		panic(err)
-	}
-
 	router := gin.Default()
 	router.Use(cors.Default())
 
@@ -41,13 +34,18 @@ func (s *Service) Run() {
 
 	router.Static("/static", "dist/static")
 
+	schema, err := LoadSchema(s.db, s.searchService)
+	if err != nil {
+		// TODO: remove panic
+		panic(err)
+	}
 	router.POST("/graphql", gin.WrapF(schema.HandleFunc))
 
 	router.GET("/image/:id", func(c *gin.Context) {
 		id := c.Param("id")
 
 		var dbImage db.Image
-		dal.Images.ByID(id, &dbImage)
+		s.db.Images.ByID(id, &dbImage)
 
 		fmt.Println(dbImage)
 
@@ -65,7 +63,7 @@ func (s *Service) Run() {
 		id := c.Param("id")
 
 		var track db.Track
-		dal.Tracks.Preload("File").ByID(id, &track)
+		s.db.Tracks.Preload("File").ByID(id, &track)
 
 		if track.ID == "" || track.File == nil {
 			c.AbortWithStatus(404)
