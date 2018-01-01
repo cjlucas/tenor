@@ -19,6 +19,8 @@ func (e *Error) Error() string {
 type DB struct {
 	db *gorm.DB
 
+	EventManager
+
 	Files        *FileCollection
 	Tracks       *TrackCollection
 	Artists      *ArtistCollection
@@ -85,7 +87,7 @@ func (db *DB) model(i interface{}) *DB {
 	}
 }
 
-func (db *DB) wrapErrors(gdb *gorm.DB) *Error {
+func (db *DB) wrapErrors(gdb *gorm.DB) error {
 	errors := gdb.GetErrors()
 	if len(errors) == 0 {
 		return nil
@@ -114,16 +116,42 @@ type Collection struct {
 	db *DB
 }
 
+func (c *Collection) dispatchEvent(model interface{}, changeType ChangeType) {
+	if m, ok := model.(*Artist); ok {
+		c.db.dispatchArtistChange(m, changeType)
+	} else if m, ok := model.(*Album); ok {
+		c.db.dispatchAlbumChange(m, changeType)
+	} else if m, ok := model.(*Track); ok {
+		c.db.dispatchTrackChange(m, changeType)
+	}
+}
+
 func (c *Collection) Create(val interface{}) error {
-	return c.db.wrapErrors(c.db.db.Create(val))
+	err := c.db.wrapErrors(c.db.db.Create(val))
+	if err == nil {
+		c.dispatchEvent(val, Created)
+	}
+
+	return err
 }
 
 func (c *Collection) Update(val interface{}) error {
-	return c.db.wrapErrors(c.db.db.Save(val))
+	err := c.db.wrapErrors(c.db.db.Save(val))
+	if err == nil {
+		c.dispatchEvent(val, Updated)
+	}
+
+	return err
 }
 
+// TODO: this should be private. All FirstOrCreate implementations should
+// be provided by the model-specific types.
 func (c *Collection) FirstOrCreate(query interface{}, val interface{}) error {
-	return c.db.wrapErrors(c.db.db.FirstOrCreate(val, query))
+	if err := c.Where(query).One(val); err == nil {
+		return nil
+	}
+
+	return c.Create(val)
 }
 
 func (c *Collection) One(out interface{}) error {
