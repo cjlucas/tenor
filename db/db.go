@@ -123,14 +123,14 @@ type Collection struct {
 	db *DB
 }
 
-func (c *Collection) dispatchEvent(model interface{}, changeType ChangeType) {
+func (c *Collection) dispatchEvent(model interface{}, eventType EventType) {
 	manager := c.db.eventManager
 	if m, ok := model.(*Artist); ok {
-		manager.dispatchArtistChange(m, changeType)
+		manager.dispatchArtistChange(m, eventType)
 	} else if m, ok := model.(*Album); ok {
-		manager.dispatchAlbumChange(m, changeType)
+		manager.dispatchAlbumChange(m, eventType)
 	} else if m, ok := model.(*Track); ok {
-		manager.dispatchTrackChange(m, changeType)
+		manager.dispatchTrackChange(m, eventType)
 	}
 }
 

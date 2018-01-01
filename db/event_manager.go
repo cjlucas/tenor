@@ -1,23 +1,23 @@
 package db
 
-type ChangeType int
+type EventType int
 
 const (
-	Created ChangeType = iota
+	Created EventType = iota
 	Updated
 	Deleted
 )
 
 type artistChangedHandler interface {
-	ArtistChanged(artist *Artist, changeType ChangeType)
+	ArtistChanged(artist *Artist, eventType EventType)
 }
 
 type albumChangedHandler interface {
-	AlbumChanged(album *Album, changeType ChangeType)
+	AlbumChanged(album *Album, eventType EventType)
 }
 
 type trackChangedHandler interface {
-	TrackChanged(track *Track, changeType ChangeType)
+	TrackChanged(track *Track, eventType EventType)
 }
 
 type EventManager struct {
@@ -37,26 +37,26 @@ func (m *EventManager) Deregister(handler interface{}) {
 	}
 }
 
-func (m *EventManager) dispatchArtistChange(artist *Artist, changeType ChangeType) {
+func (m *EventManager) dispatchArtistChange(artist *Artist, eventType EventType) {
 	for _, handler := range m.handlers {
 		if h, ok := handler.(artistChangedHandler); ok {
-			h.ArtistChanged(artist, changeType)
+			h.ArtistChanged(artist, eventType)
 		}
 	}
 }
 
-func (m *EventManager) dispatchAlbumChange(album *Album, changeType ChangeType) {
+func (m *EventManager) dispatchAlbumChange(album *Album, eventType EventType) {
 	for _, handler := range m.handlers {
 		if h, ok := handler.(albumChangedHandler); ok {
-			h.AlbumChanged(album, changeType)
+			h.AlbumChanged(album, eventType)
 		}
 	}
 }
 
-func (m *EventManager) dispatchTrackChange(track *Track, changeType ChangeType) {
+func (m *EventManager) dispatchTrackChange(track *Track, eventType EventType) {
 	for _, handler := range m.handlers {
 		if h, ok := handler.(trackChangedHandler); ok {
-			h.TrackChanged(track, changeType)
+			h.TrackChanged(track, eventType)
 		}
 	}
 }
