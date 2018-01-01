@@ -19,6 +19,8 @@ func main() {
 		panic(err)
 	}
 
+	searchService := search.NewService(dal)
+
 	artworkStore := artwork.NewStore(".images")
 
 	scannerService := scanner.NewService(dal, artworkStore, scanner.ServiceConfig{
@@ -35,8 +37,6 @@ func main() {
 	scannerService.RegisterProvider(&scanner.FSWatchProvider{
 		Dir: "/Volumes/DATA1/music",
 	})
-
-	searchService := search.NewService(dal)
 
 	apiService := api.NewService(dal, artworkStore, searchService)
 
