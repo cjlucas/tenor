@@ -19,7 +19,7 @@ func (e *Error) Error() string {
 type DB struct {
 	db *gorm.DB
 
-	EventManager
+	eventManager *EventManager
 
 	Files        *FileCollection
 	Tracks       *TrackCollection
@@ -48,6 +48,8 @@ func Open(fpath string) (*DB, error) {
 }
 
 func (db *DB) init() {
+	db.eventManager = &EventManager{}
+
 	db.Files = &FileCollection{Collection{db.model(&File{})}}
 	db.Tracks = &TrackCollection{Collection{db.model(&Track{})}}
 	db.Artists = &ArtistCollection{Collection{db.model(&Artist{})}}
@@ -83,7 +85,8 @@ func (db *DB) createView(name string, sql string) Collection {
 
 func (db *DB) model(i interface{}) *DB {
 	return &DB{
-		db: db.db.Model(i),
+		db:           db.db.Model(i),
+		eventManager: db.eventManager,
 	}
 }
 
@@ -94,6 +97,10 @@ func (db *DB) wrapErrors(gdb *gorm.DB) error {
 	}
 
 	return &Error{Errors: errors}
+}
+
+func (db *DB) Register(handler interface{}) {
+	db.eventManager.Register(handler)
 }
 
 func (db *DB) Raw(sql string, vals ...interface{}) *DB {
@@ -117,12 +124,13 @@ type Collection struct {
 }
 
 func (c *Collection) dispatchEvent(model interface{}, changeType ChangeType) {
+	manager := c.db.eventManager
 	if m, ok := model.(*Artist); ok {
-		c.db.dispatchArtistChange(m, changeType)
+		manager.dispatchArtistChange(m, changeType)
 	} else if m, ok := model.(*Album); ok {
-		c.db.dispatchAlbumChange(m, changeType)
+		manager.dispatchAlbumChange(m, changeType)
 	} else if m, ok := model.(*Track); ok {
-		c.db.dispatchTrackChange(m, changeType)
+		manager.dispatchTrackChange(m, changeType)
 	}
 }
 

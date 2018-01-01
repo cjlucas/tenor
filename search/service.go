@@ -14,11 +14,15 @@ type Service struct {
 }
 
 func NewService(dal *db.DB) *Service {
-	return &Service{
+	service := &Service{
 		artistsTrie: buildSearchTrie(dal, &dal.AlbumArtists.Collection, db.Artist{}),
 		albumsTrie:  buildSearchTrie(dal, &dal.Albums.Collection, db.Album{}),
 		tracksTrie:  buildSearchTrie(dal, &dal.Tracks.Collection, db.Track{}),
 	}
+
+	dal.Register(service)
+
+	return service
 }
 
 func buildSearchTrie(db *db.DB, coll *db.Collection, model interface{}) *Trie {
