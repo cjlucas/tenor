@@ -47,7 +47,7 @@ func (s *LookupResult) ToSlice() []string {
 
 type Trie struct {
 	children map[rune]*Trie
-	values   []string
+	values   []string // TODO: Optimize me. Make me a set.
 }
 
 func NewTrie() *Trie {
@@ -87,6 +87,19 @@ func (t *Trie) Add(key string, value string) {
 	runes := bytes.Runes([]byte(key))
 
 	t.add(runes, value)
+}
+
+func (t *Trie) DeleteValue(value string) {
+	for i, v := range t.values {
+		if v == value {
+			t.values = append(t.values[:i], t.values[i+1:]...)
+			break
+		}
+	}
+
+	for _, child := range t.children {
+		child.DeleteValue(value)
+	}
 }
 
 func (t *Trie) gatherValues() *LookupResult {
