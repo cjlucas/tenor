@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cjlucas/tenor/parsers"
+	"github.com/cjlucas/tenor/parsers/mp3"
 )
 
 func main() {
@@ -15,15 +15,17 @@ func main() {
 			panic(err)
 		}
 
-		var parser parsers.MetadataParser
-		parser.Parse(f)
+		metadata, err := mp3.Parse(f)
+
+		if err != nil {
+			panic(err)
+		}
 
 		fmt.Println(filepath.Base(fpath))
-		fmt.Printf("%d MPEG Frames\n", len(parser.MPEGHeaders))
-		fmt.Println("Bytes Skipped:", parser.BytesSkipped)
+		fmt.Printf("%d MPEG Frames\n", len(metadata.MPEGHeaders))
 
-		fmt.Printf("%#v\n", parser.ID3v2[0].Header)
-		for _, frame := range parser.ID3v2[0].Frames {
+		fmt.Printf("%#v\n", metadata.ID3v2Tags[0].Header)
+		for _, frame := range metadata.ID3v2Tags[0].Frames {
 			fmt.Println(frame.ID)
 		}
 
