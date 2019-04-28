@@ -1,4 +1,4 @@
-package trie
+package search
 
 import (
 	"bytes"
@@ -50,7 +50,7 @@ type Trie struct {
 	values   []string
 }
 
-func New() *Trie {
+func NewTrie() *Trie {
 	var t Trie
 	t.init()
 
@@ -75,7 +75,7 @@ func (t *Trie) add(runes []rune, value string) {
 	if c, ok := t.children[runes[0]]; ok {
 		child = c
 	} else {
-		child = New()
+		child = NewTrie()
 		t.children[runes[0]] = child
 	}
 

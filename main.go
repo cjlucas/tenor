@@ -1,16 +1,15 @@
 package main
 
 import (
-	"fmt"
-	"path"
-
 	_ "image/jpeg"
 	_ "image/png"
+	"time"
 
 	"github.com/cjlucas/tenor/api"
+	"github.com/cjlucas/tenor/artwork"
 	"github.com/cjlucas/tenor/db"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
+	"github.com/cjlucas/tenor/scanner"
+	"github.com/cjlucas/tenor/search"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
@@ -20,55 +19,26 @@ func main() {
 		panic(err)
 	}
 
-	schema, err := api.LoadSchema(dal)
-	if err != nil {
-		panic(err)
-	}
+	artworkStore := artwork.NewStore(".images")
 
-	router := gin.Default()
-	router.Use(cors.Default())
-
-	router.StaticFile("/", "dist/index.html")
-	router.StaticFile("/app.js", "dist/app.js")
-	router.StaticFile("/app.css", "dist/app.css")
-
-	router.Static("/static", "dist/static")
-
-	router.POST("/graphql", gin.WrapF(schema.HandleFunc))
-
-	router.GET("/image/:id", func(c *gin.Context) {
-		id := c.Param("id")
-
-		var dbImage db.Image
-		dal.Images.ByID(id, &dbImage)
-
-		fmt.Println(dbImage)
-
-		if dbImage.ID == "" {
-			c.AbortWithStatus(404)
-			return
-		}
-		c.Header("Content-Type", dbImage.MIMEType)
-
-		fpath := path.Join(".images", string(dbImage.Checksum[0]), dbImage.Checksum)
-
-		fmt.Println(fpath)
-		c.File(fpath)
+	scannerService := scanner.NewService(dal, artworkStore, scanner.ServiceConfig{
+		BatchDelay:   5 * time.Second,
+		MaxBatchSize: 500,
 	})
 
-	router.GET("/stream/:id", func(c *gin.Context) {
-		id := c.Param("id")
+	go scannerService.Run()
 
-		var track db.Track
-		dal.Tracks.Preload("File").ByID(id, &track)
-
-		if track.ID == "" || track.File == nil {
-			c.AbortWithStatus(404)
-			return
-		}
-
-		c.File(track.File.Path)
+	scannerService.RegisterProvider(&scanner.SingleScanProvider{
+		Dir: "/Volumes/DATA1/music",
 	})
 
-	router.Run(":4000")
+	scannerService.RegisterProvider(&scanner.FSWatchProvider{
+		Dir: "/Volumes/DATA1/music",
+	})
+
+	searchService := search.NewService(dal)
+
+	apiService := api.NewService(dal, artworkStore, searchService)
+
+	apiService.Run()
 }

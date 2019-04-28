@@ -39,6 +39,7 @@ type File struct {
 
 	Path  string
 	Inode uint64 `gorm:"index"`
+	MTime time.Time
 }
 
 type Image struct {
