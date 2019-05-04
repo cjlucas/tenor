@@ -131,7 +131,7 @@ func splitTerminator(buf []byte, term []byte) ([]byte, []byte) {
 }
 
 func parseBOMString(buf []byte) string {
-	// Swap to BE
+	// Swap to BE if necessary
 	if buf[0] == 255 && buf[1] == 254 {
 		for i := 0; i < len(buf); i += 2 {
 			tmp := buf[i]

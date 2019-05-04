@@ -437,7 +437,7 @@ viewAlbumSection albums key =
         albums_ =
             Dict.get key albums |> Maybe.withDefault []
     in
-        div []
+        div [ class "p2" ]
             [ div [ class "h1 bold pb3" ] [ text key ]
             , View.AlbumGrid.view SelectedAlbum albums_
             ]
