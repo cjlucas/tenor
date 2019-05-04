@@ -87,11 +87,8 @@ func (r *FLACReader) readBlock() (*FLACMetadataBlock, error) {
 func (r *FLACReader) ReadBlocks() ([]FLACMetadataBlock, error) {
 	var junk [65536]byte
 
-	n, err := r.r.Read(junk[0:4])
-	if err != nil {
+	if err := r.readExactly(junk[:], 4); err != nil {
 		return nil, err
-	} else if n != 4 {
-		return nil, errors.New("Couldn't read 4 bytes")
 	}
 
 	if !bytes.Equal(junk[0:4], flacMagicHeader) {
