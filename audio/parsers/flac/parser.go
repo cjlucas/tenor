@@ -262,51 +262,23 @@ type StreamInfoBlock struct {
 }
 
 func readStreamInfoBlock(data []byte) (*StreamInfoBlock, error) {
-	var streamInfo StreamInfoBlock
-
-	if len(data) < 2 {
-		return nil, errors.New("not enough to read min block size")
+	if len(data) < 34 {
+		return nil, errors.New("not enough data")
 	}
 
-	streamInfo.MinBlockSize = int(data[0])<<8 | int(data[1])
-	data = data[2:]
-
-	if len(data) < 2 {
-		return nil, errors.New("not enough to read max block size")
+	streamInfo := StreamInfoBlock{
+		MinBlockSize:  int(data[0])<<8 | int(data[1]),
+		MaxBlockSize:  int(data[2])<<8 | int(data[3]),
+		MinFrameSize:  int(data[4])<<16 | int(data[5])<<8 | int(data[6]),
+		MaxFrameSize:  int(data[7])<<16 | int(data[8])<<8 | int(data[9]),
+		SampleRate:    (int(data[10])<<16 | int(data[11])<<8 | int(data[12]&0xF0)) >> 4,
+		NumChannels:   (int(data[12]&0x0E) >> 1) + 1,
+		BitsPerSample: (int(data[12]&0x01)<<1 | int(data[13]>>4)&0x0F) + 1,
+		NumSamples: int(data[13]&0x0F)<<32 | int(data[14])<<24 | int(data[15])<<16 |
+			int(data[16])<<8 | int(data[17]),
 	}
 
-	streamInfo.MaxBlockSize = int(data[0])<<8 | int(data[1])
-	data = data[2:]
-
-	if len(data) < 3 {
-		return nil, errors.New("not enough to read min frame size")
-	}
-
-	streamInfo.MinFrameSize = int(data[0])<<16 | int(data[1])<<8 | int(data[2])
-	data = data[3:]
-
-	if len(data) < 3 {
-		return nil, errors.New("not enough to read max frame size")
-	}
-
-	streamInfo.MaxFrameSize = int(data[0])<<16 | int(data[1])<<8 | int(data[2])
-	data = data[3:]
-
-	if len(data) < 8 {
-		return nil, errors.New("not enough to read sample rate/num channels/bps/total samples")
-	}
-
-	streamInfo.SampleRate = (int(data[0])<<16 | int(data[1])<<8 | int(data[2]&0xF0)) >> 4
-	streamInfo.NumChannels = (int(data[2]&0x0E) >> 1) + 1
-	streamInfo.BitsPerSample = (int(data[2]&0x01)<<1 | int(data[3]>>4)&0x0F) + 1
-	streamInfo.NumSamples = int(data[3]&0x0F)<<32 | int(data[4])<<24 | int(data[5])<<16 | int(data[6])<<8 | int(data[7])
-	data = data[8:]
-
-	if len(data) < 16 {
-		return nil, errors.New("not enough to read md5 signature")
-	}
-
-	copy(streamInfo.MD5Signature[:], data[:16])
+	copy(streamInfo.MD5Signature[:], data[18:34])
 
 	return &streamInfo, nil
 }
