@@ -1,10 +1,13 @@
 package audio
 
 import (
-	"io"
+	"errors"
 	"os"
+	"path"
+	"strings"
 	"time"
 
+	"github.com/cjlucas/tenor/audio/parsers/flac"
 	"github.com/cjlucas/tenor/audio/parsers/mp3"
 )
 
@@ -29,10 +32,6 @@ type Metadata interface {
 	Images() [][]byte
 }
 
-func Parse(r io.Reader) (Metadata, error) {
-	return mp3.Parse(r)
-}
-
 func ParseFile(fpath string) (Metadata, error) {
 	fp, err := os.Open(fpath)
 
@@ -42,5 +41,12 @@ func ParseFile(fpath string) (Metadata, error) {
 
 	defer fp.Close()
 
-	return Parse(fp)
+	switch strings.ToLower(path.Ext(fpath)) {
+	case ".mp3":
+		return mp3.Parse(fp)
+	case ".flac":
+		return flac.Parse(fp)
+	default:
+		return nil, errors.New("unknown audio format")
+	}
 }

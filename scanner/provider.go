@@ -5,9 +5,16 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/rjeczalik/notify"
 )
+
+func isAudioFile(fpath string) bool {
+	ext := strings.ToLower(path.Ext(fpath))
+
+	return ext == ".mp3" || ext == ".flac"
+}
 
 type Handler interface {
 	ScanFile(fpath string)
@@ -31,7 +38,7 @@ func (p *SingleScanProvider) SetHandler(h Handler) {
 
 func (p *SingleScanProvider) Run() {
 	filepath.Walk(p.Dir, func(fpath string, info os.FileInfo, err error) error {
-		if path.Ext(fpath) == ".mp3" {
+		if isAudioFile(fpath) {
 			p.handler.ScanFile(fpath)
 		}
 
@@ -61,7 +68,7 @@ func (p *FSWatchProvider) Run() {
 		event := <-c
 		fmt.Println(event)
 
-		if path.Ext(event.Path()) == ".mp3" {
+		if isAudioFile(event.Path()) {
 			p.handler.ScanFile(event.Path())
 		}
 	}
