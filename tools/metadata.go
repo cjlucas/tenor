@@ -29,6 +29,19 @@ func main() {
 			fmt.Println(frame.ID)
 		}
 
+		fmt.Println("METADATA")
+		fmt.Println("--------------------------------------------")
+		fmt.Println(metadata.TrackName())
+		fmt.Printf("TrackName: %s\n", metadata.TrackName())
+		fmt.Printf("TrackPosition: %d\n", metadata.TrackPosition())
+		fmt.Printf("TotalTracks: %d\n", metadata.TotalTracks())
+		fmt.Printf("ArtistName: %s\n", metadata.ArtistName())
+		fmt.Printf("AlbumArtistName: %s\n", metadata.AlbumArtistName())
+		fmt.Printf("AlbumName: %s\n", metadata.AlbumName())
+		fmt.Printf("ReleaseDate: %v\n", metadata.ReleaseDate())
+		fmt.Printf("OriginalReleaseDate: %v\n", metadata.OriginalReleaseDate())
+		fmt.Printf("Duration: %f\n", metadata.Duration())
+
 		//for _, frame := range parser.ID3v2[0].TextFrames() {
 		//fmt.Println(frame)
 		//}

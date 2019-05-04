@@ -29,11 +29,11 @@ func main() {
 	go scannerService.Run()
 
 	scannerService.RegisterProvider(&scanner.SingleScanProvider{
-		Dir: "/Volumes/DATA1/music",
+		Dir: "/Volumes/RAID/music",
 	})
 
 	scannerService.RegisterProvider(&scanner.FSWatchProvider{
-		Dir: "/Volumes/DATA1/music",
+		Dir: "/Volumes/RAID/music",
 	})
 
 	searchService := search.NewService(dal)
