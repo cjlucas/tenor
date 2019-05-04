@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cjlucas/tenor/parsers/mp3"
+	"github.com/cjlucas/tenor/audio/parsers/mp3"
 )
 
 func main() {

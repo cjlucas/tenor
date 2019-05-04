@@ -10,26 +10,9 @@ import (
 	"time"
 
 	"github.com/cjlucas/tenor/artwork"
+	"github.com/cjlucas/tenor/audio"
 	"github.com/cjlucas/tenor/db"
-	"github.com/cjlucas/tenor/parsers/mp3"
 )
-
-type trackMetadata interface {
-	TrackName() string
-	TrackPosition() int
-	TotalTracks() int
-
-	ReleaseDate() time.Time
-	OriginalReleaseDate() time.Time
-
-	DiscName() string
-	DiscPosition() int
-	TotalDiscs() int
-
-	Duration() float64
-
-	Images() [][]byte
-}
 
 type fileMetadata struct {
 	Path  string
@@ -217,7 +200,7 @@ func (s *Scanner) scanBatch(fpaths []string) {
 			s.db.Files.Update(file)
 		}
 
-		trackInfo, err := scanFile(mdata.Path)
+		trackInfo, err := audio.ParseFile(mdata.Path)
 		if err != nil {
 			continue
 		}
@@ -302,15 +285,4 @@ func (s *Scanner) scanBatch(fpaths []string) {
 		}
 
 	}
-}
-
-func scanFile(fpath string) (*mp3.Metadata, error) {
-	fp, err := os.Open(fpath)
-	if err != nil {
-		return nil, fmt.Errorf("Error opening file: %s", err)
-	}
-
-	defer fp.Close()
-
-	return mp3.Parse(fp)
 }
