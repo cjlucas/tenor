@@ -24,6 +24,11 @@ type ConnectionObject struct {
 	Of *Object
 }
 
+type UnionType struct {
+	Types        []*Object
+	TypeResolver func(interface{}) *Object
+}
+
 type Field struct {
 	Name     string
 	Type     interface{}
@@ -241,8 +246,18 @@ func cloneValue(val reflect.Value) reflect.Value {
 func (s *Schema) buildResolver(buildCtx *schemaBuildContext, resolver interface{}) (graphql.FieldResolveFn, error) {
 	resolverValue := reflect.ValueOf(resolver)
 
-	methodValue := resolverValue.MethodByName("Resolve")
 	var noValue reflect.Value
+	if resolverValue == noValue {
+		return nil, nil
+	}
+
+	fmt.Println("dude")
+	fmt.Println(resolverValue)
+	fmt.Println(resolverValue == reflect.Value{})
+
+	methodValue := resolverValue.MethodByName("Resolve")
+
+	fmt.Printf("%#v\n", resolver)
 	if methodValue == noValue && resolverValue.Kind() != reflect.Func {
 		return nil, errors.New("Resolver must be a function or a receiver with a method called Resolve")
 	}
@@ -380,6 +395,29 @@ func (s *Schema) buildObject(buildCtx *schemaBuildContext, object *Object) (*gra
 			}
 
 			output = connObject
+
+		case UnionType:
+			var underlyingTypes []*graphql.Object
+
+			for _, obj := range t.Types {
+				object, err := s.buildObject(buildCtx, obj)
+				if err != nil {
+					panic("omg")
+				}
+
+				underlyingTypes = append(underlyingTypes, object)
+			}
+
+			unionType := graphql.NewUnion(graphql.UnionConfig{
+				Name:  "foo",
+				Types: underlyingTypes,
+				ResolveType: func(p graphql.ResolveTypeParams) *graphql.Object {
+					obj := t.TypeResolver(p.Value)
+					return buildCtx.objects[obj.Name]
+				},
+			})
+
+			output = unionType
 		default:
 			return nil, errors.New("unknown Type")
 		}
@@ -592,7 +630,99 @@ func LoadSchema(dal *db.DB, searchService *search.Service) (*Schema, error) {
 		},
 	})
 
+	// Change & Change Events
+
+	changeObject := NewObject("Change")
+
+	trackCreatedEventObject := NewObject("TrackCreated")
+
+	trackCreatedEventObject.AddField(&Field{
+		Name: "track",
+		Type: trackObject,
+		Resolver: func(ctx context.Context, parent *db.Change) (*db.Track, error) {
+			var track db.Track
+
+			if err := dal.Tracks.Where("id = ?", parent.TrackID).One(&track); err != nil {
+				return nil, err
+			}
+
+			return &track, nil
+		},
+	})
+
+	artistCreatedEventObject := NewObject("ArtistCreated")
+
+	artistCreatedEventObject.AddField(&Field{
+		Name: "artist",
+		Type: artistObject,
+		Resolver: func(ctx context.Context, parent *db.Change) (*db.Artist, error) {
+			var artist db.Artist
+
+			if err := dal.Artists.Where("id = ?", parent.ArtistID).One(&artist); err != nil {
+				return nil, err
+			}
+
+			return &artist, nil
+		},
+	})
+
+	changeObject.AddField(&Field{
+		Name: "event",
+		Type: UnionType{
+			Types: []*Object{
+				artistCreatedEventObject,
+				trackCreatedEventObject,
+			},
+			TypeResolver: func(c interface{}) *Object {
+				change, ok := c.(*db.Change)
+				if !ok {
+					return nil
+				}
+
+				if change.TrackID != "" {
+					return trackCreatedEventObject
+				}
+				if change.ArtistID != "" {
+					return artistCreatedEventObject
+				}
+
+				return nil
+			},
+		},
+		Resolver: &weedResolver{},
+	})
+
+	schema.AddQuery(&Field{
+		Name:     "change",
+		Type:     changeObject,
+		Resolver: &FooResolver{DB: dal},
+	})
+
 	return schema, schema.Build(dal)
+}
+
+type weedResolver struct{}
+
+func (r *weedResolver) Resolve(ctx context.Context, parent interface{}) (interface{}, error) {
+	fmt.Println("WEEDZZ")
+	fmt.Printf("%#v\n", parent)
+	return parent, nil
+}
+
+type FooResolver struct {
+	DB *db.DB
+
+	Since int `args:"since"`
+}
+
+func (r *FooResolver) Resolve(ctx context.Context) (interface{}, error) {
+	var c db.Change
+	fmt.Println("WTF")
+	if err := r.DB.Changes.One(&c); err != nil {
+		return nil, err
+	}
+
+	return &c, nil
 }
 
 func (s *Schema) HandleFunc(w http.ResponseWriter, r *http.Request) {

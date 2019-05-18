@@ -38,6 +38,7 @@ type DB struct {
 	AlbumsView   *AlbumCollection
 	Discs        *DiscCollection
 	Images       *ImageCollection
+	Changes      *ChangeCollection
 }
 
 func Open(fpath string) (*DB, error) {
@@ -79,6 +80,7 @@ func (db *DB) init() {
 
 	db.Discs = &DiscCollection{Collection{db.model(&Disc{})}}
 	db.Images = &ImageCollection{Collection{db.model(&Image{})}}
+	db.Changes = &ChangeCollection{Collection{db.model(&Change{})}}
 }
 
 func (db *DB) createView(name string, sql string) Collection {
@@ -287,4 +289,8 @@ func (c *ImageCollection) FirstOrCreate(image *Image) error {
 	}
 
 	return c.Collection.FirstOrCreate(query, image)
+}
+
+type ChangeCollection struct {
+	Collection
 }
