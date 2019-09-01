@@ -6,8 +6,10 @@ import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import Iso8601
 import List.Extra
 import Task exposing (Task)
+import Time
 import View.AlbumGrid
 import View.AlbumModal
 
@@ -39,16 +41,21 @@ type alias Album =
     , name : String
     , imageId : Maybe String
     , artistName : String
-    , createdAt : String
+    , createdAt : Time.Posix
     , discs : List Disc
     }
 
 
 dateField name attrs =
-    GraphQL.field
-        name
-        attrs
-        GraphQL.string
+    let
+        parseMaybeDateTimeStr =
+            Maybe.andThen (Result.toMaybe << Iso8601.toTime)
+    in
+    GraphQL.assume <|
+        GraphQL.field
+            name
+            attrs
+            (GraphQL.map parseMaybeDateTimeStr (GraphQL.nullable GraphQL.string))
 
 
 albumSpec =

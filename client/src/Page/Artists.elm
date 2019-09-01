@@ -9,9 +9,13 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
 import InfiniteScroll as IS
+import Iso8601
 import Json.Decode
 import List.Extra
 import Task exposing (Task)
+import Time
+import Time.Format
+import Time.Format.Config.Config_en_us as Config_en_us
 import Utils exposing (onScroll)
 import View.AlbumTracklist
 
@@ -62,18 +66,21 @@ type alias Album =
     { id : String
     , name : String
     , imageId : Maybe String
-    , releaseDate : Maybe String
+    , releaseDate : Maybe Time.Posix
     , discs : List Disc
     }
 
 
 albumSpec =
     let
+        parseMaybeDateTimeStr =
+            Maybe.andThen (Result.toMaybe << Iso8601.toTime)
+
         dateField name attrs =
             GraphQL.field
                 name
                 attrs
-                (GraphQL.nullable GraphQL.string)
+                (GraphQL.map parseMaybeDateTimeStr (GraphQL.nullable GraphQL.string))
     in
     GraphQL.object Album
         |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
@@ -115,7 +122,9 @@ sortAlbums : Artist -> Artist
 sortAlbums artist =
     let
         releaseDate album =
-            Maybe.withDefault "0000-00-00T00:00:00Z" album.releaseDate
+            album.releaseDate
+                |> Maybe.withDefault (Time.millisToPosix 0)
+                |> Time.posixToMillis
     in
     { artist | albums = List.sortBy releaseDate artist.albums }
 
@@ -426,8 +435,11 @@ viewAlbum album =
 
         albumInfo album_ =
             let
+                formatReleaseDate =
+                    Time.Format.format Config_en_us.config "%B %-d, %Y" Time.utc
+
                 maybeReleaseDate =
-                    album_.releaseDate
+                    Maybe.map formatReleaseDate album_.releaseDate
             in
             [ Just (albumDuration album_)
             , maybeReleaseDate

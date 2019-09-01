@@ -8,10 +8,12 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import InfiniteScroll as IS
+import Iso8601
 import Json.Decode
 import List.Extra
 import Set
 import Task exposing (Task)
+import Time
 import Utils exposing (onScroll)
 import View.AlbumGrid
 import View.AlbumModal
@@ -31,8 +33,8 @@ type alias BasicAlbum =
     , name : String
     , imageId : Maybe String
     , artistName : String
-    , createdAt : String
-    , releaseDate : String
+    , createdAt : Time.Posix
+    , releaseDate : Time.Posix
     }
 
 
@@ -51,16 +53,21 @@ type alias Album =
     , name : String
     , imageId : Maybe String
     , artistName : String
-    , createdAt : String
+    , createdAt : Time.Posix
     , discs : List Disc
     }
 
 
 dateField name attrs =
-    GraphQL.field
-        name
-        attrs
-        GraphQL.string
+    let
+        parseMaybeDateTimeStr =
+            Maybe.andThen (Result.toMaybe << Iso8601.toTime)
+    in
+    GraphQL.assume <|
+        GraphQL.field
+            name
+            attrs
+            (GraphQL.map parseMaybeDateTimeStr (GraphQL.nullable GraphQL.string))
 
 
 albumSpec =
@@ -146,7 +153,7 @@ setAlbums albums model =
                     String.left 1 album.artistName |> String.toUpper |> toAlpha
 
                 ReleaseDate ->
-                    "0"
+                    Time.toYear Time.utc album.releaseDate |> String.fromInt
 
         reducer album acc =
             let
