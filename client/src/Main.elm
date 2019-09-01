@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Api
 import Browser
+import Browser.Dom as Dom
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
@@ -250,6 +251,7 @@ type Msg
     | SearchFocus
     | SearchInput String
     | SearchSubmit
+    | DomAction (Result Dom.Error ())
 
 
 update msg model =
@@ -320,8 +322,12 @@ update msg model =
             ( model_
             , Cmd.batch
                 [ cmd
+                , Dom.blur "search" |> Task.attempt DomAction
                 ]
             )
+
+        DomAction _ ->
+            update NoOp model
 
         NoOp ->
             ( model, Cmd.none )
