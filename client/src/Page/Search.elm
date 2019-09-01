@@ -1,16 +1,16 @@
-module Page.Search exposing (Model, Msg, OutMsg(..), init, willAppear, didAppear, update, view)
+module Page.Search exposing (Model, Msg, OutMsg(..), didAppear, init, update, view, willAppear)
 
-import GraphQL.Request.Builder as GraphQL
+import Api
 import GraphQL.Client.Http
+import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput, onSubmit)
-import Task exposing (Task)
-import Date exposing (Date)
 import List.Extra
-import Api
+import Task exposing (Task)
 import View.AlbumGrid
 import View.AlbumModal
+
 
 
 -- Model
@@ -39,18 +39,16 @@ type alias Album =
     , name : String
     , imageId : Maybe String
     , artistName : String
-    , createdAt : Date
+    , createdAt : String
     , discs : List Disc
     }
 
 
 dateField name attrs =
-    GraphQL.assume
-        (GraphQL.field
-            name
-            attrs
-            (GraphQL.map (Result.toMaybe << Date.fromString) GraphQL.string)
-        )
+    GraphQL.field
+        name
+        attrs
+        GraphQL.string
 
 
 albumSpec =
@@ -127,9 +125,9 @@ willAppear query model =
         processSearchResultsTask results =
             Task.succeed <| processSearchResults results model
     in
-        Api.search query artistSpec albumSpec trackSpec
-            |> Api.sendRequest
-            |> Task.andThen processSearchResultsTask
+    Api.search query artistSpec albumSpec trackSpec
+        |> Api.sendRequest
+        |> Task.andThen processSearchResultsTask
 
 
 didAppear : Model -> ( Model, Cmd Msg )
@@ -164,10 +162,10 @@ update msg model =
             let
                 album =
                     model.albums
-                        |> List.filter (\album -> album.id == id)
+                        |> List.filter (\album_ -> album_.id == id)
                         |> List.head
             in
-                ( { model | selectedAlbum = album }, Cmd.none, Nothing )
+            ( { model | selectedAlbum = album }, Cmd.none, Nothing )
 
         SelectedAlbumTrack id ->
             let
@@ -183,7 +181,7 @@ update msg model =
                     tracks
                         |> List.Extra.dropWhile (\track -> track.id /= id)
             in
-                ( model, Cmd.none, Just (PlayTracks selectedTracks) )
+            ( model, Cmd.none, Just (PlayTracks selectedTracks) )
 
         SelectedTrack id ->
             let
@@ -191,7 +189,7 @@ update msg model =
                     model.tracks
                         |> List.filter (\track -> track.id == id)
             in
-                ( model, Cmd.none, Just (PlayTracks tracks) )
+            ( model, Cmd.none, Just (PlayTracks tracks) )
 
         DismissModal ->
             ( { model | selectedAlbum = Nothing }, Cmd.none, Nothing )
@@ -204,14 +202,14 @@ processSearchResults : SearchResults -> Model -> Model
 processSearchResults results model =
     let
         extractNodes =
-            (List.map .node) << .edges
+            List.map .node << .edges
 
         artists =
             extractNodes results.artists
 
         albums =
-            (extractNodes results.albums)
-                ++ (List.concatMap .albums artists)
+            extractNodes results.albums
+                ++ List.concatMap .albums artists
 
         albumTracks =
             albums
@@ -219,14 +217,14 @@ processSearchResults results model =
                 |> List.concatMap .tracks
 
         tracks =
-            (extractNodes results.tracks)
+            extractNodes results.tracks
                 ++ albumTracks
     in
-        { artists = artists |> List.Extra.uniqueBy .id |> List.take 20
-        , albums = albums |> List.Extra.uniqueBy .id |> List.take 20
-        , tracks = tracks |> List.Extra.uniqueBy .id |> List.take 20
-        , selectedAlbum = Nothing
-        }
+    { artists = artists |> List.Extra.uniqueBy .id |> List.take 20
+    , albums = albums |> List.Extra.uniqueBy .id |> List.take 20
+    , tracks = tracks |> List.Extra.uniqueBy .id |> List.take 20
+    , selectedAlbum = Nothing
+    }
 
 
 viewArtist artist =
@@ -259,30 +257,31 @@ viewTrack track =
                 Nothing ->
                     "/static/images/missing_artwork.svg"
     in
-        div [ class "col sm-col-12 md-col-6 lg-col-4" ]
-            [ div
-                [ class "flex mr4 pointer border-bottom pt2 pb1 pr2"
-                , onClick (SelectedTrack track.id)
-                ]
-                [ img [ class "fit pr1", src imageUrl, style [ ( "height", "60px" ) ] ] []
-                , div [ class "flex-auto" ]
-                    [ div [ class "h4 bold pb1" ] [ text track.name ]
-                    , div [ class "h4" ] [ text track.artistName ]
-                    ]
+    div [ class "col sm-col-12 md-col-6 lg-col-4" ]
+        [ div
+            [ class "flex mr4 pointer border-bottom pt2 pb1 pr2"
+            , onClick (SelectedTrack track.id)
+            ]
+            [ img [ class "fit pr1", src imageUrl, style "height" "60px" ] []
+            , div [ class "flex-auto" ]
+                [ div [ class "h4 bold pb1" ] [ text track.name ]
+                , div [ class "h4" ] [ text track.artistName ]
                 ]
             ]
+        ]
 
 
 viewTrackResults tracks =
     div [ class "flex flex-wrap" ] (List.map viewTrack tracks)
 
 
-viewResultSection sectionName view elements =
+viewResultSection sectionName resultsView elements =
     if List.length elements > 0 then
         div [ class "pt2" ]
             [ div [ class "h1 bold pt2 pb1 mb2 border-bottom" ] [ text sectionName ]
-            , view elements
+            , resultsView elements
             ]
+
     else
         text ""
 

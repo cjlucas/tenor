@@ -1,4 +1,4 @@
-module Route exposing (Route, Route(..))
+module Route exposing (Route(..))
 
 
 type Route

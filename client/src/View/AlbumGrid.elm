@@ -1,7 +1,7 @@
 module View.AlbumGrid exposing (view)
 
-import Html exposing (div, text, img)
-import Html.Attributes exposing (class, style, src)
+import Html exposing (div, img, text)
+import Html.Attributes exposing (class, src, style)
 import Html.Events exposing (onClick)
 
 
@@ -18,19 +18,19 @@ viewAlbum onClickMsg album =
     let
         albumImg =
             img
-                [ style [ ( "width", "100%" ) ]
+                [ style "width" "100%"
                 , src (albumUrl album)
                 ]
                 []
     in
-        div
-            [ class "col sm-col-6 md-col-3 lg-col-2 pl2 pr2 mb3 pointer"
-            , onClick (onClickMsg album.id)
-            ]
-            [ div [ class "box" ] [ albumImg ]
-            , div [ class "h3 bold pt1" ] [ text album.name ]
-            , div [ class "h4" ] [ text album.artistName ]
-            ]
+    div
+        [ class "col sm-col-6 md-col-3 lg-col-2 pl2 pr2 mb3 pointer"
+        , onClick (onClickMsg album.id)
+        ]
+        [ div [ class "box" ] [ albumImg ]
+        , div [ class "h3 bold pt1" ] [ text album.name ]
+        , div [ class "h4" ] [ text album.artistName ]
+        ]
 
 
 view onClickMsg albums =
@@ -43,10 +43,8 @@ view onClickMsg albums =
 
            Similarly, we do the same for left and right padding.
         -}
-        , style
-            [ ( "margin-bottom", "-2rem" )
-            , ( "margin-left", "-1rem" )
-            , ( "margin-right", "-1rem" )
-            ]
+        , style "margin-bottom" "-2rem"
+        , style "margin-left" "-1rem"
+        , style "margin-right" "-1rem"
         ]
         (List.map (viewAlbum onClickMsg) albums)

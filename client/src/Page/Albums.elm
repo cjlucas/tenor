@@ -1,25 +1,22 @@
-module Page.Albums exposing (Model, Msg, OutMsg(..), init, willAppear, didAppear, update, view)
+module Page.Albums exposing (Model, Msg, OutMsg(..), didAppear, init, update, view, willAppear)
 
-import GraphQL.Request.Builder as GraphQL
-import GraphQL.Client.Http
 import Api
-import Task exposing (Task)
+import Dict exposing (Dict)
+import GraphQL.Client.Http
+import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import InfiniteScroll as IS
 import Json.Decode
 import List.Extra
-import InfiniteScroll as IS
-import Utils exposing (onScroll)
-import Date exposing (Date)
-import Dict exposing (Dict)
 import Set
-import View.AlbumTracklist
-import Dom
-import Dom.Scroll
-import Json.Decode
+import Task exposing (Task)
+import Utils exposing (onScroll)
 import View.AlbumGrid
 import View.AlbumModal
+import View.AlbumTracklist
+
 
 
 -- Model
@@ -34,8 +31,8 @@ type alias BasicAlbum =
     , name : String
     , imageId : Maybe String
     , artistName : String
-    , createdAt : Date
-    , releaseDate : Date
+    , createdAt : String
+    , releaseDate : String
     }
 
 
@@ -54,18 +51,16 @@ type alias Album =
     , name : String
     , imageId : Maybe String
     , artistName : String
-    , createdAt : Date
+    , createdAt : String
     , discs : List Disc
     }
 
 
 dateField name attrs =
-    GraphQL.assume
-        (GraphQL.field
-            name
-            attrs
-            (GraphQL.map (Result.toMaybe << Date.fromString) GraphQL.string)
-        )
+    GraphQL.field
+        name
+        attrs
+        GraphQL.string
 
 
 albumSpec =
@@ -138,6 +133,7 @@ setAlbums albums model =
         toAlpha x =
             if Set.member x alpha then
                 x
+
             else
                 "#"
 
@@ -150,22 +146,22 @@ setAlbums albums model =
                     String.left 1 album.artistName |> String.toUpper |> toAlpha
 
                 ReleaseDate ->
-                    Date.year album.releaseDate |> toString
+                    "0"
 
         reducer album acc =
             let
                 key =
                     keyer album
 
-                albums =
+                albums_ =
                     acc |> Dict.get key |> Maybe.withDefault []
             in
-                Dict.insert key (albums ++ [ album ]) acc
+            Dict.insert key (albums_ ++ [ album ]) acc
 
         albumsDict =
             List.foldl reducer model.albums albums
     in
-        { model | albums = albumsDict }
+    { model | albums = albumsDict }
 
 
 
@@ -204,25 +200,21 @@ willAppear model =
                             model_ =
                                 setAlbums (List.map .node connection.edges) model
                         in
-                            Task.succeed
-                                { model_
-                                    | infiniteScroll = is
-                                }
+                        Task.succeed
+                            { model_
+                                | infiniteScroll = is
+                            }
                     )
     in
-        if Dict.size model.albums > 0 then
-            Nothing
-        else
-            Just task
+    if Dict.size model.albums > 0 then
+        Nothing
+
+    else
+        Just task
 
 
 didAppear model =
-    let
-        cmd =
-            Dom.Scroll.toY "viewport" model.albumsYPos
-                |> Task.attempt NoopScroll
-    in
-        ( model, cmd )
+    ( model, Cmd.none )
 
 
 
@@ -235,7 +227,7 @@ type OutMsg
 
 type Msg
     = NoOp
-    | NoopScroll (Result Dom.Error ())
+    | NoopScroll (Result Never ())
     | NewSortOrder Order
     | FetchedAlbums (Result GraphQL.Client.Http.Error (Api.Connection BasicAlbum))
     | SelectedAlbum String
@@ -263,8 +255,8 @@ loadAlbumsTask order limit maybeCursor =
                 ReleaseDate ->
                     ( "release_date", False )
     in
-        Api.getAlbums orderBy desc limit maybeCursor connectionSpec
-            |> Api.sendRequest
+    Api.getAlbums orderBy desc limit maybeCursor connectionSpec
+        |> Api.sendRequest
 
 
 loadAlbums : Order -> Int -> Maybe String -> IS.Direction -> Cmd Msg
@@ -290,7 +282,7 @@ update msg model =
                     loadAlbumsTask order 50 Nothing
                         |> Task.attempt FetchedAlbums
             in
-                ( model_, cmd, Nothing )
+            ( model_, cmd, Nothing )
 
         FetchedAlbums (Ok connection) ->
             let
@@ -313,7 +305,7 @@ update msg model =
                 model_ =
                     setAlbums (List.map .node connection.edges) model
             in
-                ( { model_ | infiniteScroll = is }, Cmd.none, Nothing )
+            ( { model_ | infiniteScroll = is }, Cmd.none, Nothing )
 
         FetchedAlbums (Err err) ->
             ( model, Cmd.none, Nothing )
@@ -325,7 +317,7 @@ update msg model =
                         |> Api.sendRequest
                         |> Task.attempt GotSelectedAlbum
             in
-                ( model, cmd, Nothing )
+            ( model, cmd, Nothing )
 
         GotSelectedAlbum (Ok album) ->
             ( { model | selectedAlbum = Just album }, Cmd.none, Nothing )
@@ -344,39 +336,39 @@ update msg model =
                 outMsg =
                     Just (UpdatePlaylist tracks)
             in
-                ( { model | selectedAlbum = Nothing }, Cmd.none, outMsg )
+            ( { model | selectedAlbum = Nothing }, Cmd.none, outMsg )
 
         AlbumsScroll value ->
             let
                 cmd =
                     IS.cmdFromScrollEvent InfiniteScrollMsg value
             in
-                {--
+            {--
                   IMPORTANT: The Json.Decode.Value cannot be logged due
                   to cyclical references within the value.
 
                   Issues with toString are being tracked here:
                   https://github.com/elm-lang/core/issues/723
                   --}
-                case Json.Decode.decodeValue Utils.onScrollDecoder value of
-                    Ok pos ->
-                        ( { model | albumsYPos = pos }, cmd, Nothing )
+            case Json.Decode.decodeValue Utils.onScrollDecoder value of
+                Ok pos ->
+                    ( { model | albumsYPos = pos }, cmd, Nothing )
 
-                    Err err ->
-                        ( model, cmd, Nothing )
+                Err err ->
+                    ( model, cmd, Nothing )
 
         DismissModal ->
             ( { model | selectedAlbum = Nothing }, Cmd.none, Nothing )
 
-        InfiniteScrollMsg msg ->
+        InfiniteScrollMsg scrollMsg ->
             let
                 ( is, cmd ) =
                     IS.update
                         InfiniteScrollMsg
-                        msg
+                        scrollMsg
                         model.infiniteScroll
             in
-                ( { model | infiniteScroll = is }, cmd, Nothing )
+            ( { model | infiniteScroll = is }, cmd, Nothing )
 
         NoOp ->
             ( model, Cmd.none, Nothing )
@@ -413,22 +405,23 @@ viewHeader order =
                 onClickAction =
                     if order /= sortOrder then
                         NewSortOrder sortOrder
+
                     else
                         NoOp
             in
-                button
-                    [ class "btn"
-                    , disabled isDisabled
-                    , onClick onClickAction
-                    ]
-                    [ div [ class "h4 bold" ] [ text btnText ] ]
-    in
-        div [ class "flex flex-wrap m2 pb1 border-bottom" ]
-            [ div [ class "col col-3" ]
-                [ div [ class "h2 bold pb1" ] [ text "Sort By" ]
-                , div [ class "btn-group" ] (List.map viewButton buttons)
+            button
+                [ class "btn"
+                , disabled isDisabled
+                , onClick onClickAction
                 ]
+                [ div [ class "h4 bold" ] [ text btnText ] ]
+    in
+    div [ class "flex flex-wrap m2 pb1 border-bottom" ]
+        [ div [ class "col col-3" ]
+            [ div [ class "h2 bold pb1" ] [ text "Sort By" ]
+            , div [ class "btn-group" ] (List.map viewButton buttons)
             ]
+        ]
 
 
 viewAlbumSection : Dict String (List BasicAlbum) -> String -> Html Msg
@@ -437,10 +430,10 @@ viewAlbumSection albums key =
         albums_ =
             Dict.get key albums |> Maybe.withDefault []
     in
-        div [ class "p2" ]
-            [ div [ class "h1 bold pb3" ] [ text key ]
-            , View.AlbumGrid.view SelectedAlbum albums_
-            ]
+    div [ class "p2" ]
+        [ div [ class "h1 bold pb3" ] [ text key ]
+        , View.AlbumGrid.view SelectedAlbum albums_
+        ]
 
 
 viewAlbums albums =
@@ -448,7 +441,7 @@ viewAlbums albums =
         keys =
             Dict.keys albums |> List.sort
     in
-        List.map (viewAlbumSection albums) keys
+    List.map (viewAlbumSection albums) keys
 
 
 view model =
@@ -459,7 +452,7 @@ view model =
             , id "viewport"
             , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
             ]
-            ((viewHeader model.sortOrder)
-                :: (viewAlbums model.albums)
+            (viewHeader model.sortOrder
+                :: viewAlbums model.albums
             )
         ]
