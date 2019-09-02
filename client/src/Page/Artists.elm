@@ -15,8 +15,7 @@ import Json.Decode
 import List.Extra
 import Task exposing (Task)
 import Time
-import Time.Format
-import Time.Format.Config.Config_en_us as Config_en_us
+import TimeFormatter
 import Utils exposing (onScroll)
 import View.AlbumTracklist
 
@@ -437,7 +436,8 @@ viewAlbum album =
         albumInfo album_ =
             let
                 formatReleaseDate =
-                    Time.Format.format Config_en_us.config "%B %-d, %Y" Time.utc
+                    TimeFormatter.withFormat "%B %-d, %Y"
+                        |> TimeFormatter.format
 
                 maybeReleaseDate =
                     Maybe.map formatReleaseDate album_.releaseDate
