@@ -2,7 +2,7 @@ module View.AlbumModal exposing (view)
 
 import Html exposing (Html, div, img, text)
 import Html.Attributes exposing (class, classList, src)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, stopPropagationOn)
 import Json.Decode
 import View.AlbumTracklist
 
@@ -17,7 +17,11 @@ albumUrl album =
 
 
 onClickStopProp msg =
-    onClick msg
+    let
+        alwaysStopPropagation msg_ =
+            ( msg_, True )
+    in
+    stopPropagationOn "click" (Json.Decode.map alwaysStopPropagation (Json.Decode.succeed msg))
 
 
 view dismissMsg noopMsg selectedTrackMsg album =
@@ -28,7 +32,7 @@ view dismissMsg noopMsg selectedTrackMsg album =
         viewContent =
             case album of
                 Just album_ ->
-                    div [ class "modal-content p3", onClickStopProp dismissMsg ]
+                    div [ class "modal-content p3", onClickStopProp noopMsg ]
                         [ div [ class "pb2" ]
                             [ albumImg album_
                             , div [ class "flex-auto" ]
@@ -49,6 +53,6 @@ view dismissMsg noopMsg selectedTrackMsg album =
     in
     div
         [ classList [ ( "modal", album /= Nothing ) ]
-        , onClick dismissMsg
+        , onClickStopProp dismissMsg
         ]
         [ viewContent ]
