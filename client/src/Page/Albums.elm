@@ -1,6 +1,7 @@
 module Page.Albums exposing (Model, Msg, OutMsg(..), didAppear, init, update, view, willAppear)
 
 import Api
+import Browser.Dom as Dom
 import Dict exposing (Dict)
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
@@ -221,7 +222,12 @@ willAppear model =
 
 
 didAppear model =
-    ( model, Cmd.none )
+    let
+        cmd =
+            Dom.setViewportOf "viewport" 0 model.albumsYPos
+                |> Task.attempt NoopScroll
+    in
+    ( model, cmd )
 
 
 
@@ -234,7 +240,7 @@ type OutMsg
 
 type Msg
     = NoOp
-    | NoopScroll (Result Never ())
+    | NoopScroll (Result Dom.Error ())
     | NewSortOrder Order
     | FetchedAlbums (Result GraphQL.Client.Http.Error (Api.Connection BasicAlbum))
     | SelectedAlbum String

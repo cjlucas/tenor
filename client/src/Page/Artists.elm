@@ -1,6 +1,7 @@
 module Page.Artists exposing (Model, Msg, OutMsg(..), didAppear, init, selectArtist, update, view, willAppear)
 
 import Api
+import Browser.Dom as Dom
 import Dict exposing (Dict)
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
@@ -259,7 +260,7 @@ didAppear model =
 
         cmd =
             scrollPositions
-                |> List.map (\x -> Task.succeed ())
+                |> List.map (\( id, pos ) -> Dom.setViewportOf id 0 pos)
                 |> List.map (Task.attempt NoopScroll)
                 |> Cmd.batch
     in
@@ -283,7 +284,7 @@ type Msg
     | SidebarScroll Float
     | AlbumsScroll Json.Decode.Value
     | InfiniteScrollMsg IS.Msg
-    | NoopScroll (Result Never ())
+    | NoopScroll (Result Dom.Error ())
 
 
 update msg model =
@@ -298,7 +299,7 @@ update msg model =
         GotArtist (Ok artist) ->
             let
                 cmd =
-                    Task.succeed () |> Task.attempt NoopScroll
+                    Dom.setViewportOf "albums" 0 0 |> Task.attempt NoopScroll
 
                 model_ =
                     model
