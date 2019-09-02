@@ -1,21 +1,22 @@
 module Main exposing (main)
 
+import Api
+import Browser
+import Browser.Dom as Dom
+import GraphQL.Client.Http
+import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
-import Api
-import Task exposing (Task)
-import GraphQL.Request.Builder as GraphQL
-import GraphQL.Client.Http
-import Ports
 import Json.Decode as Decode
 import List.Extra
-import Page.Artists
 import Page.Albums
+import Page.Artists
 import Page.Search
+import Ports
 import Route exposing (Route)
-import Dom
+import Task exposing (Task)
 
 
 streamUrl id =
@@ -23,7 +24,7 @@ streamUrl id =
 
 
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -98,11 +99,12 @@ updateTrack id newState player =
                     (\( track, state ) ->
                         if track.id == id then
                             ( track, newState )
+
                         else
                             ( track, state )
                     )
     in
-        { player | tracks = tracks }
+    { player | tracks = tracks }
 
 
 trackToPrime : List ( Track, BufferingState ) -> Maybe Track
@@ -133,17 +135,18 @@ primeTracks player =
         primerTrack =
             trackToPrime player.tracks
     in
-        if bufferedTrackCount < maxBufferedTracks then
-            case primerTrack of
-                Just track ->
-                    ( (updateTrack track.id Loading player)
-                    , Ports.load track.id (streamUrl track.id)
-                    )
+    if bufferedTrackCount < maxBufferedTracks then
+        case primerTrack of
+            Just track ->
+                ( updateTrack track.id Loading player
+                , Ports.load track.id (streamUrl track.id)
+                )
 
-                Nothing ->
-                    ( player, Cmd.none )
-        else
-            ( player, Cmd.none )
+            Nothing ->
+                ( player, Cmd.none )
+
+    else
+        ( player, Cmd.none )
 
 
 type alias Track =
@@ -195,7 +198,12 @@ setPageState page model =
 -- Init
 
 
-init =
+type alias Flags =
+    {}
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
     let
         model =
             { player = defaultPlayer
@@ -207,7 +215,7 @@ init =
             , searchPageState = Page.Search.init
             }
     in
-        loadPage Route.Artists model
+    loadPage Route.Artists model
 
 
 
@@ -260,20 +268,20 @@ update msg model =
                     { model | pageState = PageLoaded }
                         |> setPageState page_
             in
-                ( model_, cmd )
+            ( model_, cmd )
 
         ShowPage (Err err) ->
             ( model, Cmd.none )
 
-        PageMsg msg ->
-            updatePage msg model
+        PageMsg pageMsg ->
+            updatePage pageMsg model
 
         PlayerEvent event ->
             let
                 ( player, cmd ) =
                     updatePlayer event model.player
             in
-                ( { model | player = player }, cmd )
+            ( { model | player = player }, cmd )
 
         TogglePlayPause ->
             case model.player.state of
@@ -291,14 +299,14 @@ update msg model =
                 ( player, cmd ) =
                     playNextTrack model.player
             in
-                ( { model | player = player }, cmd )
+            ( { model | player = player }, cmd )
 
         PlayPrevious ->
             let
                 ( player, cmd ) =
                     playPreviousTrack model.player
             in
-                ( { model | player = player }, cmd )
+            ( { model | player = player }, cmd )
 
         SearchFocus ->
             ( { model | searchInput = "" }, Cmd.none )
@@ -311,12 +319,12 @@ update msg model =
                 ( model_, cmd ) =
                     loadPage Route.Search model
             in
-                ( model_
-                , Cmd.batch
-                    [ cmd
-                    , Dom.blur "search" |> Task.attempt DomAction
-                    ]
-                )
+            ( model_
+            , Cmd.batch
+                [ cmd
+                , Dom.blur "search" |> Task.attempt DomAction
+                ]
+            )
 
         DomAction _ ->
             update NoOp model
@@ -334,7 +342,7 @@ resetPlayerWithTracks tracks model =
         player_ =
             { player | tracks = List.map (\track -> ( track, None )) tracks }
     in
-        ( { model | player = player_ }, Ports.reset )
+    ( { model | player = player_ }, Ports.reset )
 
 
 loadPage : Route -> Model -> ( Model, Cmd Msg )
@@ -358,7 +366,7 @@ loadPage route model =
         cmd =
             Task.attempt ShowPage task
     in
-        ( { model | currentRoute = route, pageState = PageLoading }, cmd )
+    ( { model | currentRoute = route, pageState = PageLoading }, cmd )
 
 
 pageDidAppear : Page -> ( Page, Cmd Msg )
@@ -369,37 +377,37 @@ pageDidAppear page =
                 ( pageModel_, cmd ) =
                     didAppearFn pageModel
             in
-                ( pageTag pageModel
-                , Cmd.map (PageMsg << pageMsgTag) cmd
-                )
+            ( pageTag pageModel
+            , Cmd.map (PageMsg << pageMsgTag) cmd
+            )
     in
-        case page of
-            Artists pageModel ->
-                didAppear Artists
-                    ArtistsMsg
-                    Page.Artists.didAppear
-                    pageModel
+    case page of
+        Artists pageModel ->
+            didAppear Artists
+                ArtistsMsg
+                Page.Artists.didAppear
+                pageModel
 
-            Albums pageModel ->
-                didAppear Albums
-                    AlbumsMsg
-                    Page.Albums.didAppear
-                    pageModel
+        Albums pageModel ->
+            didAppear Albums
+                AlbumsMsg
+                Page.Albums.didAppear
+                pageModel
 
-            Search pageModel ->
-                didAppear Search
-                    SearchMsg
-                    Page.Search.didAppear
-                    pageModel
+        Search pageModel ->
+            didAppear Search
+                SearchMsg
+                Page.Search.didAppear
+                pageModel
 
 
 updatePage : PageMsg -> Model -> ( Model, Cmd Msg )
 updatePage msg model =
     case msg of
-        ArtistsMsg msg ->
+        ArtistsMsg artistMsg ->
             let
                 ( pageModel_, pageCmd, outMsg ) =
-                    Page.Artists.update msg model.artistsPageState
+                    Page.Artists.update artistMsg model.artistsPageState
 
                 ( model_, cmd ) =
                     case outMsg of
@@ -415,12 +423,12 @@ updatePage msg model =
                         , cmd
                         ]
             in
-                ( { model_ | artistsPageState = pageModel_ }, batchCmd )
+            ( { model_ | artistsPageState = pageModel_ }, batchCmd )
 
-        AlbumsMsg msg ->
+        AlbumsMsg albumMsg ->
             let
                 ( pageModel_, pageCmd, outMsg ) =
-                    Page.Albums.update msg model.albumsPageState
+                    Page.Albums.update albumMsg model.albumsPageState
 
                 ( model_, resetCmd ) =
                     case outMsg of
@@ -436,26 +444,26 @@ updatePage msg model =
                         , resetCmd
                         ]
             in
-                ( { model_ | albumsPageState = pageModel_ }, cmd )
+            ( { model_ | albumsPageState = pageModel_ }, cmd )
 
-        SearchMsg msg ->
+        SearchMsg searchMsg ->
             let
                 ( pageModel, pageCmd, outMsg ) =
-                    Page.Search.update msg model.searchPageState
+                    Page.Search.update searchMsg model.searchPageState
 
                 ( model_, cmd ) =
                     case outMsg of
                         Just (Page.Search.ChoseArtist id) ->
                             let
-                                ( artistsState, cmd ) =
+                                ( artistsState, artistCmd ) =
                                     Page.Artists.selectArtist id model.artistsPageState
                             in
-                                ( { model
-                                    | currentRoute = Route.Artists
-                                    , artistsPageState = artistsState
-                                  }
-                                , Cmd.map (PageMsg << ArtistsMsg) cmd
-                                )
+                            ( { model
+                                | currentRoute = Route.Artists
+                                , artistsPageState = artistsState
+                              }
+                            , Cmd.map (PageMsg << ArtistsMsg) artistCmd
+                            )
 
                         Just (Page.Search.PlayTracks tracks) ->
                             resetPlayerWithTracks tracks model
@@ -469,9 +477,9 @@ updatePage msg model =
                         , cmd
                         ]
             in
-                ( { model_ | searchPageState = pageModel }
-                , batchCmd
-                )
+            ( { model_ | searchPageState = pageModel }
+            , batchCmd
+            )
 
 
 playNextTrack : Player -> ( Player, Cmd Msg )
@@ -490,23 +498,23 @@ playNextTrack player =
         cmd =
             Cmd.batch [ unloadCurrentTrackCmd, primeCmd ]
     in
-        case Debug.log "playNextTrack head" (List.head player_.tracks) of
-            Just ( track, Loaded ) ->
-                ( player_, Cmd.batch [ cmd, Ports.playId track.id ] )
+    case Debug.log "playNextTrack head" (List.head player_.tracks) of
+        Just ( track, Loaded ) ->
+            ( player_, Cmd.batch [ cmd, Ports.playId track.id ] )
 
-            Just ( track, Loading ) ->
-                -- If the current track is still loading, wait for the Load event
-                ( player_, cmd )
+        Just ( track, Loading ) ->
+            -- If the current track is still loading, wait for the Load event
+            ( player_, cmd )
 
-            Just ( track, Errored ) ->
-                -- If the head of the playlist had a load error, load the next track
-                playNextTrack player_
+        Just ( track, Errored ) ->
+            -- If the head of the playlist had a load error, load the next track
+            playNextTrack player_
 
-            Just ( track, None ) ->
-                ( player_, Ports.load track.id (streamUrl track.id) )
+        Just ( track, None ) ->
+            ( player_, Ports.load track.id (streamUrl track.id) )
 
-            Nothing ->
-                ( player_, cmd )
+        Nothing ->
+            ( player_, cmd )
 
 
 playPreviousTrack player =
@@ -515,8 +523,8 @@ playPreviousTrack player =
             let
                 ( player_, unloadCmd ) =
                     case List.head player.tracks of
-                        Just ( track, _ ) ->
-                            ( updateTrack track.id None player, Ports.unload track.id )
+                        Just ( track_, _ ) ->
+                            ( updateTrack track.id None player, Ports.unload track_.id )
 
                         Nothing ->
                             ( player, Cmd.none )
@@ -535,7 +543,7 @@ playPreviousTrack player =
                         , Ports.load track.id (streamUrl track.id)
                         ]
             in
-                ( Debug.log "playPreviousTrack player" player__, cmd )
+            ( Debug.log "playPreviousTrack player" player__, cmd )
 
         Nothing ->
             ( player, Cmd.none )
@@ -554,23 +562,24 @@ updatePlayer event player =
                 playCmd =
                     if isCurrentTrack id player_ then
                         Ports.playId id
+
                     else
                         Cmd.none
             in
-                ( player_, Cmd.batch [ cmd, playCmd ] )
+            ( player_, Cmd.batch [ cmd, playCmd ] )
 
         LoadError id ->
             let
                 player_ =
                     updateTrack id Errored player
             in
-                case trackToPrime player_.tracks of
-                    Just track ->
-                        -- TODO: Prime the track
-                        ( updateTrack track.id Loading player_, Cmd.none )
+            case trackToPrime player_.tracks of
+                Just track ->
+                    -- TODO: Prime the track
+                    ( updateTrack track.id Loading player_, Cmd.none )
 
-                    Nothing ->
-                        ( player_, Cmd.none )
+                Nothing ->
+                    ( player_, Cmd.none )
 
         Play ->
             ( { player | state = Playing }, Cmd.none )
@@ -639,12 +648,12 @@ decodePlayerEvent value =
                 _ ->
                     Decode.fail ("Unknown player event: " ++ type_)
     in
-        case Decode.decodeValue decoder value of
-            Ok msg ->
-                PlayerEvent msg
+    case Decode.decodeValue decoder value of
+        Ok msg ->
+            PlayerEvent msg
 
-            _ ->
-                NoOp
+        _ ->
+            NoOp
 
 
 subscriptions model =
@@ -668,33 +677,33 @@ viewNowPlaying player =
                 ]
                 []
     in
-        case List.head player.tracks of
-            Just ( track, _ ) ->
-                let
-                    image =
-                        case track.imageId of
-                            Just id ->
-                                img [ class "pr1", src ("/image/" ++ id) ] []
+    case List.head player.tracks of
+        Just ( track, _ ) ->
+            let
+                image =
+                    case track.imageId of
+                        Just id ->
+                            img [ class "pr1", src ("/image/" ++ id) ] []
 
-                            Nothing ->
-                                text ""
-                in
-                    div [ class "now-playing flex align-middle" ]
-                        [ div [ class "flex controls" ]
-                            [ i [ class "p1 fa fa-2x fa-backward", onClick PlayPrevious ] []
-                            , playPauseIcon
-                            , i [ class "p1 fa fa-2x fa-forward", onClick PlayNext ] []
-                            ]
-                        , image
-                        , div [ class "flex flex-column justify-center" ]
-                            [ div [ class "h4 bold" ] [ text track.name ]
-                            , div [ class "h5" ] [ text track.artistName ]
-                            , div [ class "h5 bold align-bottom" ] [ text "Up Next: Something Else" ]
-                            ]
-                        ]
+                        Nothing ->
+                            text ""
+            in
+            div [ class "now-playing flex align-middle" ]
+                [ div [ class "flex controls" ]
+                    [ i [ class "p1 fa fa-2x fa-backward", onClick PlayPrevious ] []
+                    , playPauseIcon
+                    , i [ class "p1 fa fa-2x fa-forward", onClick PlayNext ] []
+                    ]
+                , image
+                , div [ class "flex flex-column justify-center" ]
+                    [ div [ class "h4 bold" ] [ text track.name ]
+                    , div [ class "h5" ] [ text track.artistName ]
+                    , div [ class "h5 bold align-bottom" ] [ text "Up Next: Something Else" ]
+                    ]
+                ]
 
-            Nothing ->
-                text ""
+        Nothing ->
+            text ""
 
 
 viewHeader model =
@@ -716,14 +725,12 @@ viewHeader model =
             div []
                 [ ul [ class "ml2 mr2 inline-block list-reset" ] viewItems
                 , Html.form [ class "inline-block", onSubmit SearchSubmit ]
-                    [ div [ class "inline-block", style [ ( "position", "relative" ) ] ]
+                    [ div [ class "inline-block", style "position" "relative" ]
                         [ i
                             [ class "fa fa-search"
-                            , style
-                                [ ( "position", "absolute" )
-                                , ( "top", "10px" )
-                                , ( "left", "10px" )
-                                ]
+                            , style "position" "absolute"
+                            , style "top" "10px"
+                            , style "left" "10px"
                             ]
                             []
                         , input
@@ -740,13 +747,13 @@ viewHeader model =
                     ]
                 ]
     in
-        div [ class "header flex pl1 pr1 justify-between items-center border-bottom" ]
-            [ div [ class "flex items-center pl2" ]
-                [ span [ class "logo" ] [ text "Tenor" ]
-                , viewMenu
-                ]
-            , viewNowPlaying player
+    div [ class "header flex pl1 pr1 justify-between items-center border-bottom" ]
+        [ div [ class "flex items-center pl2" ]
+            [ span [ class "logo" ] [ text "Tenor" ]
+            , viewMenu
             ]
+        , viewNowPlaying player
+        ]
 
 
 viewPage model =

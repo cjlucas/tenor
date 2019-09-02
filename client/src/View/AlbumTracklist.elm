@@ -17,22 +17,23 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
                 viewTrackArtist =
                     if showTrackArtist then
                         div [ class "h6 track-artist" ] [ text track.artistName ]
+
                     else
                         text ""
             in
-                div [ class "col col-6 pl1 pr1 track" ]
-                    [ div [ class "flex pb1 pt2 pointer track-content", onClick (chooseTrackMsg track.id) ]
-                        [ div [ class "pr1 h5 track-position" ] [ text (toString track.position ++ ". ") ]
-                        , div [ class "flex-auto pr1" ]
-                            [ div [ class "pb1 h5" ] [ text track.name ]
-                            , viewTrackArtist
-                            ]
-                        , div [ class "h5" ] [ text (duration track) ]
+            div [ class "col col-6 pl1 pr1 track" ]
+                [ div [ class "flex pb1 pt2 pointer track-content", onClick (chooseTrackMsg track.id) ]
+                    [ div [ class "pr1 h5 track-position" ] [ text (String.fromInt track.position ++ ". ") ]
+                    , div [ class "flex-auto pr1" ]
+                        [ div [ class "pb1 h5" ] [ text track.name ]
+                        , viewTrackArtist
                         ]
+                    , div [ class "h5" ] [ text (duration track) ]
                     ]
+                ]
 
         i =
-            ((List.length tracks) |> toFloat) / 2 |> ceiling
+            (List.length tracks |> toFloat) / 2 |> ceiling
 
         ( left, right ) =
             List.Extra.splitAt i tracks
@@ -44,7 +45,7 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
         viewRow row =
             div [ class "flex flex-wrap track-list-row" ] (List.map viewTrack row)
     in
-        div [ class "track-list pb2" ] (List.map viewRow rows)
+    div [ class "track-list pb2" ] (List.map viewRow rows)
 
 
 discName disc =
@@ -53,7 +54,7 @@ discName disc =
             name
 
         Nothing ->
-            "Disc " ++ (toString disc.position)
+            "Disc " ++ String.fromInt disc.position
 
 
 view chooseTrackMsg album =
@@ -74,6 +75,7 @@ view chooseTrackMsg album =
         discHeader disc =
             if List.length album.discs > 1 then
                 div [ class "h3 bold pb1" ] [ text (discName disc) ]
+
             else
                 text ""
 
@@ -83,4 +85,4 @@ view chooseTrackMsg album =
                 , viewTracks chooseTrackMsg showTrackArtists disc.tracks
                 ]
     in
-        div [] (List.map viewDisc discs)
+    div [] (List.map viewDisc discs)

@@ -1,8 +1,10 @@
 import Player from './player';
-import Elm from './Main';
+import { Elm } from './src/Main';
 import css from './app.scss';
 
-const app = Elm.Main.fullscreen();
+const app = Elm.Main.init({
+  node: document.getElementById("body")
+});
 
 const player = new Player(app.ports.playerEvent.send);
 
@@ -37,4 +39,3 @@ app.ports.reset_.subscribe(() => {
     type: 'reset'
   });
 });
-

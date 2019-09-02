@@ -1,23 +1,25 @@
-module Page.Artists exposing (Model, OutMsg(..), Msg, init, willAppear, didAppear, update, selectArtist, view)
+module Page.Artists exposing (Model, Msg, OutMsg(..), didAppear, init, selectArtist, update, view, willAppear)
 
+import Api
+import Browser.Dom as Dom
+import Dict exposing (Dict)
+import GraphQL.Client.Http
+import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed
-import Api
-import GraphQL.Request.Builder as GraphQL
-import GraphQL.Client.Http
-import Task exposing (Task)
+import InfiniteScroll as IS
+import Iso8601
+import Json.Decode
 import List.Extra
+import Task exposing (Task)
+import Time
+import Time.Format
+import Time.Format.Config.Config_en_us as Config_en_us
 import Utils exposing (onScroll)
 import View.AlbumTracklist
-import Dom
-import Dom.Scroll
-import Date exposing (Date)
-import Date.Extra
-import Dict exposing (Dict)
-import InfiniteScroll as IS
-import Json.Decode
+
 
 
 -- Model
@@ -38,13 +40,13 @@ trackSpec =
         fromArtist f =
             GraphQL.field "artist" [] (GraphQL.extract f)
     in
-        GraphQL.object Track
-            |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-            |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
-            |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
-            |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-            |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
-            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+    GraphQL.object Track
+        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+        |> GraphQL.with (GraphQL.field "position" [] GraphQL.int)
+        |> GraphQL.with (GraphQL.field "duration" [] GraphQL.float)
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (fromArtist (GraphQL.field "name" [] GraphQL.string))
+        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
 
 
 type alias Disc =
@@ -65,37 +67,28 @@ type alias Album =
     { id : String
     , name : String
     , imageId : Maybe String
-    , releaseDate : Maybe Date
+    , releaseDate : Maybe Time.Posix
     , discs : List Disc
     }
 
 
 albumSpec =
     let
-        parseMaybeDateStr maybeStr =
-            let
-                parseDateStr s =
-                    case Date.fromString s of
-                        Ok d ->
-                            Just d
-
-                        Err err ->
-                            Nothing
-            in
-                maybeStr |> Maybe.andThen parseDateStr
+        parseMaybeDateTimeStr =
+            Maybe.andThen (Result.toMaybe << Iso8601.toTime)
 
         dateField name attrs =
             GraphQL.field
                 name
                 attrs
-                (GraphQL.map parseMaybeDateStr (GraphQL.nullable GraphQL.string))
+                (GraphQL.map parseMaybeDateTimeStr (GraphQL.nullable GraphQL.string))
     in
-        GraphQL.object Album
-            |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
-            |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
-            |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
-            |> GraphQL.with (dateField "releaseDate" [])
-            |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
+    GraphQL.object Album
+        |> GraphQL.with (GraphQL.field "id" [] GraphQL.id)
+        |> GraphQL.with (GraphQL.field "name" [] GraphQL.string)
+        |> GraphQL.with (GraphQL.field "imageId" [] (GraphQL.nullable GraphQL.string))
+        |> GraphQL.with (dateField "releaseDate" [])
+        |> GraphQL.with (GraphQL.field "discs" [] (GraphQL.list discSpec))
 
 
 type alias SidebarArtist =
@@ -131,10 +124,10 @@ sortAlbums artist =
     let
         releaseDate album =
             album.releaseDate
-                |> Maybe.withDefault (Date.fromTime 0)
-                |> Date.toTime
+                |> Maybe.withDefault (Time.millisToPosix 0)
+                |> Time.posixToMillis
     in
-        { artist | albums = List.sortBy releaseDate artist.albums }
+    { artist | albums = List.sortBy releaseDate artist.albums }
 
 
 findAlbum : String -> Artist -> Maybe Album
@@ -174,10 +167,10 @@ addSelectedArtists artists model =
         artists_ =
             List.map sortAlbums artists
     in
-        { model
-            | selectedArtists = model.selectedArtists ++ artists_
-            , albumMap = albumMap
-        }
+    { model
+        | selectedArtists = model.selectedArtists ++ artists_
+        , albumMap = albumMap
+    }
 
 
 setInfiniteScrollLoadFunc : (IS.Direction -> Cmd Msg) -> Model -> Model
@@ -188,7 +181,7 @@ setInfiniteScrollLoadFunc loadFunc model =
                 |> IS.stopLoading
                 |> IS.loadMoreCmd loadFunc
     in
-        { model | infiniteScroll = infiniteScroll }
+    { model | infiniteScroll = infiniteScroll }
 
 
 
@@ -227,7 +220,7 @@ willAppear model =
                 artists =
                     List.map .node connection.edges
             in
-                { model | artists = artists }
+            { model | artists = artists }
 
         tasks =
             Task.sequence
@@ -241,19 +234,20 @@ willAppear model =
         extractArtists connection =
             List.map .node connection.edges
 
-        handleResponses response model =
+        handleResponses response model_ =
             case response of
                 SidebarArtists connection ->
                     { model | artists = extractArtists connection }
 
                 SelectedArtists connection ->
-                    handleLoadArtistsResponse connection model
+                    handleLoadArtistsResponse connection model_
     in
-        if List.length model.artists > 0 then
-            Task.succeed model
-        else
-            tasks
-                |> Task.andThen ((List.foldl handleResponses model) >> Task.succeed)
+    if List.length model.artists > 0 then
+        Task.succeed model
+
+    else
+        tasks
+            |> Task.andThen (List.foldl handleResponses model >> Task.succeed)
 
 
 didAppear : Model -> ( Model, Cmd Msg )
@@ -266,11 +260,11 @@ didAppear model =
 
         cmd =
             scrollPositions
-                |> List.map (\( id, pos ) -> Dom.Scroll.toY id pos)
+                |> List.map (\( id, pos ) -> Dom.setViewportOf id 0 pos)
                 |> List.map (Task.attempt NoopScroll)
                 |> Cmd.batch
     in
-        ( model, cmd )
+    ( model, cmd )
 
 
 
@@ -300,19 +294,19 @@ update msg model =
                 ( model_, cmd ) =
                     selectArtist id model
             in
-                ( model_, cmd, Nothing )
+            ( model_, cmd, Nothing )
 
         GotArtist (Ok artist) ->
             let
                 cmd =
-                    Dom.Scroll.toY "albums" 0 |> Task.attempt NoopScroll
+                    Dom.setViewportOf "albums" 0 0 |> Task.attempt NoopScroll
 
                 model_ =
                     model
                         |> resetSelectedArtists
                         |> addSelectedArtists [ artist ]
             in
-                ( model_, cmd, Nothing )
+            ( model_, cmd, Nothing )
 
         SelectedAllArtists ->
             let
@@ -321,10 +315,10 @@ update msg model =
                         |> resetSelectedArtists
                         |> setInfiniteScrollLoadFunc (loadArtists Nothing)
             in
-                ( model_
-                , loadArtistsTask Nothing |> Task.attempt GotArtists
-                , Nothing
-                )
+            ( model_
+            , loadArtistsTask Nothing |> Task.attempt GotArtists
+            , Nothing
+            )
 
         GotArtists (Ok connection) ->
             ( handleLoadArtistsResponse connection model, Cmd.none, Nothing )
@@ -344,7 +338,7 @@ update msg model =
                         Nothing ->
                             []
             in
-                ( model, Cmd.none, Just (UpdatePlaylist tracks) )
+            ( model, Cmd.none, Just (UpdatePlaylist tracks) )
 
         SidebarScroll pos ->
             ( { model | sidebarYPos = pos }, Cmd.none, Nothing )
@@ -354,19 +348,19 @@ update msg model =
                 cmd =
                     IS.cmdFromScrollEvent InfiniteScrollMsg value
             in
-                case Json.Decode.decodeValue Utils.onScrollDecoder value of
-                    Ok pos ->
-                        ( { model | albumsYPos = pos }, cmd, Nothing )
+            case Json.Decode.decodeValue Utils.onScrollDecoder value of
+                Ok pos ->
+                    ( { model | albumsYPos = pos }, cmd, Nothing )
 
-                    Err err ->
-                        ( model, cmd, Nothing )
+                Err err ->
+                    ( model, cmd, Nothing )
 
-        InfiniteScrollMsg msg ->
+        InfiniteScrollMsg scrollMsg ->
             let
                 ( infiniteScroll, cmd ) =
-                    IS.update InfiniteScrollMsg msg model.infiniteScroll
+                    IS.update InfiniteScrollMsg scrollMsg model.infiniteScroll
             in
-                ( { model | infiniteScroll = infiniteScroll }, cmd, Nothing )
+            ( { model | infiniteScroll = infiniteScroll }, cmd, Nothing )
 
         -- TODO: Remove me
         _ ->
@@ -377,11 +371,11 @@ selectArtist : String -> Model -> ( Model, Cmd Msg )
 selectArtist id model =
     let
         cmd =
-            (Api.getArtist id artistSpec)
+            Api.getArtist id artistSpec
                 |> Api.sendRequest
                 |> Task.attempt GotArtist
     in
-        ( setInfiniteScrollLoadFunc noopLoadMore model, cmd )
+    ( setInfiniteScrollLoadFunc noopLoadMore model, cmd )
 
 
 loadArtistsTask maybeCursor =
@@ -392,7 +386,7 @@ loadArtistsTask maybeCursor =
         spec =
             Api.connectionSpec "artist" artistSpec
     in
-        Api.getAlbumArtists limit maybeCursor spec |> Api.sendRequest
+    Api.getAlbumArtists limit maybeCursor spec |> Api.sendRequest
 
 
 loadArtists maybeCursor direction =
@@ -413,9 +407,9 @@ handleLoadArtistsResponse connection model =
                 Nothing ->
                     noopLoadMore
     in
-        model
-            |> addSelectedArtists (List.map .node connection.edges)
-            |> setInfiniteScrollLoadFunc loadMoreCmd
+    model
+        |> addSelectedArtists (List.map .node connection.edges)
+        |> setInfiniteScrollLoadFunc loadMoreCmd
 
 
 
@@ -424,8 +418,8 @@ handleLoadArtistsResponse connection model =
 
 viewAlbum album =
     let
-        albumImage album =
-            case album.imageId of
+        albumImage album_ =
+            case album_.imageId of
                 Just id ->
                     img [ src ("/image/" ++ id) ] []
 
@@ -433,38 +427,40 @@ viewAlbum album =
                     img [ src "/static/images/missing_artwork.svg" ] []
 
         albumDuration : Album -> String
-        albumDuration album =
-            album.discs
+        albumDuration album_ =
+            album_.discs
                 |> List.concatMap .tracks
                 |> List.map (round << .duration)
                 |> List.sum
                 |> Utils.durationHumanText
 
-        albumInfo album =
+        albumInfo album_ =
             let
+                formatReleaseDate =
+                    Time.Format.format Config_en_us.config "%B %-d, %Y" Time.utc
+
                 maybeReleaseDate =
-                    album.releaseDate
-                        |> Maybe.map (Date.Extra.toFormattedString "MMMM d, y")
+                    Maybe.map formatReleaseDate album_.releaseDate
             in
-                [ Just (albumDuration album)
-                , maybeReleaseDate
-                ]
-                    |> List.filter (\x -> x /= Nothing)
-                    |> List.map (Maybe.withDefault "")
-                    |> String.join " · "
-    in
-        ( album.id
-        , div [ class "flex pb4 album" ]
-            [ div [ class "pr3" ] [ albumImage album ]
-            , div [ class "flex-auto" ]
-                [ div [ class "border-bottom" ]
-                    [ div [ class "h2 bold" ] [ text album.name ]
-                    , div [ class "h5 pb1 dim" ] [ text (albumInfo album) ]
-                    ]
-                , View.AlbumTracklist.view (SelectedTrack album.id) album
-                ]
+            [ Just (albumDuration album_)
+            , maybeReleaseDate
             ]
-        )
+                |> List.filter (\x -> x /= Nothing)
+                |> List.map (Maybe.withDefault "")
+                |> String.join " · "
+    in
+    ( album.id
+    , div [ class "flex pb4 album" ]
+        [ div [ class "pr3" ] [ albumImage album ]
+        , div [ class "flex-auto" ]
+            [ div [ class "border-bottom" ]
+                [ div [ class "h2 bold" ] [ text album.name ]
+                , div [ class "h5 pb1 dim" ] [ text (albumInfo album) ]
+                ]
+            , View.AlbumTracklist.view (SelectedTrack album.id) album
+            ]
+        ]
+    )
 
 
 viewArtist artist =
@@ -486,15 +482,17 @@ viewSidebarArtist artist =
     let
         artistInfo =
             String.join " "
-                [ toString artist.albumCount
+                [ String.fromInt artist.albumCount
                 , if artist.albumCount == 1 then
                     "album"
+
                   else
                     "albums"
                 , "·"
-                , toString artist.trackCount
+                , String.fromInt artist.trackCount
                 , if artist.trackCount == 1 then
                     "track"
+
                   else
                     "tracks"
                 ]
@@ -509,7 +507,7 @@ viewSidebarArtist artist =
                     [ text artistInfo ]
                 ]
     in
-        viewSidebarEntry viewContent (SelectedArtist artist.id)
+    viewSidebarEntry viewContent (SelectedArtist artist.id)
 
 
 viewSidebar artists =
@@ -521,14 +519,14 @@ viewSidebar artists =
             viewSidebarEntry allArtistsEntryContent SelectedAllArtists
 
         viewEntries =
-            allArtistsEntry :: (List.map viewSidebarArtist artists)
+            allArtistsEntry :: List.map viewSidebarArtist artists
     in
-        div
-            [ id "sidebar"
-            , class "full-height-scrollable sidebar pr3"
-            , onScroll SidebarScroll
-            ]
-            viewEntries
+    div
+        [ id "sidebar"
+        , class "full-height-scrollable sidebar pr3"
+        , onScroll SidebarScroll
+        ]
+        viewEntries
 
 
 viewMain model =
@@ -536,12 +534,12 @@ viewMain model =
         artists =
             model.selectedArtists
     in
-        div
-            [ id "albums"
-            , class "full-height-scrollable content flex-auto pl4 pr4 mb4 pt2"
-            , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
-            ]
-            (List.map viewArtist artists)
+    div
+        [ id "albums"
+        , class "full-height-scrollable content flex-auto pl4 pr4 mb4 pt2"
+        , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
+        ]
+        (List.map viewArtist artists)
 
 
 view model =

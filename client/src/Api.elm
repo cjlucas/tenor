@@ -1,9 +1,9 @@
-module Api exposing (..)
+module Api exposing (Connection, Edge, Request(..), RequestSpec, SearchResults, connectionSpec, endpointUrl, getAlbum, getAlbumArtists, getAlbums, getArtist, search, sendRequest)
 
-import GraphQL.Request.Builder as GraphQL exposing (..)
-import GraphQL.Request.Builder.Variable as Var
-import GraphQL.Request.Builder.Arg as Arg
 import GraphQL.Client.Http as GraphQLHttp
+import GraphQL.Request.Builder as GraphQL exposing (..)
+import GraphQL.Request.Builder.Arg as Arg
+import GraphQL.Request.Builder.Variable as Var
 import Task exposing (Task)
 
 
@@ -24,9 +24,9 @@ connectionSpec nodeName spec =
             GraphQL.object Edge
                 |> with (field nodeName [] spec)
     in
-        GraphQL.object Connection
-            |> with (field "endCursor" [] (nullable string))
-            |> with (field "edges" [] (list edgeSpec))
+    GraphQL.object Connection
+        |> with (field "endCursor" [] (nullable string))
+        |> with (field "edges" [] (list edgeSpec))
 
 
 endpointUrl =
@@ -81,7 +81,7 @@ getAlbumArtists limit cursor outSpec =
                     outSpec
                 )
     in
-        Query docSpec args
+    Query docSpec args
 
 
 getArtist id outSpec =
@@ -100,7 +100,7 @@ getArtist id outSpec =
                     outSpec
                 )
     in
-        Query docSpec args
+    Query docSpec args
 
 
 getAlbums orderBy desc limit maybeCursor outSpec =
@@ -117,6 +117,7 @@ getAlbums orderBy desc limit maybeCursor outSpec =
         cursorArgName =
             if desc then
                 "before"
+
             else
                 "after"
 
@@ -141,7 +142,7 @@ getAlbums orderBy desc limit maybeCursor outSpec =
                     outSpec
                 )
     in
-        Query docSpec args
+    Query docSpec args
 
 
 getAlbum id outSpec =
@@ -160,7 +161,7 @@ getAlbum id outSpec =
                     outSpec
                 )
     in
-        Query docSpec args
+    Query docSpec args
 
 
 type alias SearchResults artist album track =
@@ -194,4 +195,4 @@ search query artistSpec albumSpec trackSpec =
         args =
             { query = query, first = 20 }
     in
-        Query outSpec args
+    Query outSpec args
