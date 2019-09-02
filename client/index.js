@@ -3,7 +3,7 @@ import { Elm } from './src/Main';
 import css from './app.scss';
 
 const app = Elm.Main.init({
-  node: document.getElementById("body")
+  node: document.getElementById("spa-container")
 });
 
 const player = new Player(app.ports.playerEvent.send);
