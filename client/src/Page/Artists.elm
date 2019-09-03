@@ -3,6 +3,7 @@ module Page.Artists exposing (Model, Msg, OutMsg(..), didAppear, init, selectArt
 import Api
 import Browser.Dom as Dom
 import Dict exposing (Dict)
+import Element
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
@@ -543,8 +544,9 @@ viewMain model =
 
 
 view model =
-    div [ class "flex" ]
-        [ viewSidebar model.artists
-        , span [ class "divider mt2 mb2" ] []
-        , viewMain model
-        ]
+    Element.layout [] <|
+        Element.row []
+            [ Element.html (viewSidebar model.artists)
+            , Element.html (span [ class "divider mt2 mb2" ] [])
+            , Element.html (viewMain model)
+            ]
