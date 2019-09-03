@@ -205,7 +205,7 @@ func (m *Metadata) ArtistName() string {
 }
 
 func (m *Metadata) AlbumArtistName() string {
-	frame := m.findID3v2TextFrameByID("TPE1")
+	frame := m.findID3v2TextFrameByID("TPE2")
 
 	if frame == nil {
 		return ""
