@@ -4,6 +4,8 @@ import Api
 import Browser.Dom as Dom
 import Dict exposing (Dict)
 import Element
+import Element.Border as Border
+import Element.Font as Font
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
@@ -471,12 +473,26 @@ viewArtist artist =
         ]
 
 
+elInColumn attrs =
+    let
+        workaroundAttrs =
+            [ Element.htmlAttribute <| style "flex-basis" "auto"
+            , Element.htmlAttribute <| style "flex-shrink" "0"
+            ]
+    in
+    Element.el (attrs ++ workaroundAttrs)
+
+
 viewSidebarEntry viewContent onClickMsg =
-    div
-        [ class "pointer right-align border-bottom"
-        , onClick onClickMsg
+    elInColumn
+        [ Element.htmlAttribute <| onClick onClickMsg
+        , Element.paddingEach { top = 16, right = 0, bottom = 16, left = 10 }
+        , Border.widthEach { top = 0, right = 0, bottom = 1, left = 0 }
+        , Border.color (Element.rgba255 151 151 151 0.25)
+        , Element.width Element.fill
+        , Element.pointer
         ]
-        [ viewContent ]
+        viewContent
 
 
 viewSidebarArtist artist =
@@ -499,13 +515,16 @@ viewSidebarArtist artist =
                 ]
 
         viewContent =
-            div []
-                [ div
-                    [ class "h3 bold pl2 pb1 pt2" ]
-                    [ text artist.name ]
-                , div
-                    [ class "h5 pb1" ]
-                    [ text artistInfo ]
+            Element.column [ Element.alignRight, Font.alignRight, Element.spacing 10 ] <|
+                [ Element.paragraph
+                    [ Font.heavy
+                    , Font.size 24
+                    ]
+                    [ Element.text artist.name ]
+                , Element.paragraph
+                    [ Font.size 16
+                    ]
+                    [ Element.text artistInfo ]
                 ]
     in
     viewSidebarEntry viewContent (SelectedArtist artist.id)
@@ -514,7 +533,12 @@ viewSidebarArtist artist =
 viewSidebar artists =
     let
         allArtistsEntryContent =
-            div [ class "h3 bold pt2 pb2" ] [ text "All Artists" ]
+            Element.paragraph
+                [ Font.heavy
+                , Font.size 24
+                , Font.alignRight
+                ]
+                [ Element.text "All Artists" ]
 
         allArtistsEntry =
             viewSidebarEntry allArtistsEntryContent SelectedAllArtists
@@ -522,10 +546,11 @@ viewSidebar artists =
         viewEntries =
             allArtistsEntry :: List.map viewSidebarArtist artists
     in
-    div
-        [ id "sidebar"
-        , class "full-height-scrollable sidebar pr3"
-        , onScroll SidebarScroll
+    Element.column
+        [ Element.width (Element.fill |> Element.maximum 550)
+        , Element.scrollbarY
+        , Element.htmlAttribute <| style "height" "100%"
+        , Element.paddingEach { top = 0, right = 20, bottom = 0, left = 0 }
         ]
         viewEntries
 
@@ -546,7 +571,6 @@ viewMain model =
 view model =
     Element.layout [] <|
         Element.row []
-            [ Element.html (viewSidebar model.artists)
-            , Element.html (span [ class "divider mt2 mb2" ] [])
-            , Element.html (viewMain model)
+            [ viewSidebar model.artists
+            , Element.html <| viewMain model
             ]
