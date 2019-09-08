@@ -6,6 +6,8 @@ import Dict exposing (Dict)
 import Element
 import Element.Border as Border
 import Element.Font as Font
+import Element.Keyed as Keyed
+import Element.Lazy
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)
@@ -423,10 +425,16 @@ viewAlbum album =
         albumImage album_ =
             case album_.imageId of
                 Just id ->
-                    img [ src ("/image/" ++ id) ] []
+                    Element.image [ Element.alignTop, Element.width (Element.px 300) ]
+                        { src = "/image/" ++ id
+                        , description = "Cover for " ++ album_.name
+                        }
 
                 Nothing ->
-                    img [ src "/static/images/missing_artwork.svg" ] []
+                    Element.image [ Element.alignTop, Element.width (Element.px 300) ]
+                        { src = "/static/images/missing_artwork.svg"
+                        , description = "Missing cover for" ++ album_.name
+                        }
 
         albumDuration : Album -> String
         albumDuration album_ =
@@ -453,12 +461,24 @@ viewAlbum album =
                 |> String.join " · "
     in
     ( album.id
-    , div [ class "flex pb4 album" ]
-        [ div [ class "pr3" ] [ albumImage album ]
-        , div [ class "flex-auto" ]
-            [ div [ class "border-bottom" ]
-                [ div [ class "h2 bold" ] [ text album.name ]
-                , div [ class "h5 pb1 dim" ] [ text (albumInfo album) ]
+    , Element.row
+        [ Element.htmlAttribute <| style "flex-basis" "auto"
+        , Element.htmlAttribute <| style "flex-shrink" "0"
+        , Element.spacingXY 20 0
+        , Element.paddingEach { top = 20, right = 0, bottom = 0, left = 0 }
+        ]
+      <|
+        [ albumImage album
+        , Element.column [ Element.alignTop ]
+            [ Element.column
+                [ Element.spacing 10
+                , Border.widthEach { top = 0, right = 0, bottom = 1, left = 0 }
+                , Border.color (Element.rgba255 151 151 151 0.25)
+                , Element.paddingEach { top = 0, right = 0, bottom = 4, left = 0 }
+                , Element.width Element.fill
+                ]
+                [ Element.paragraph [ Font.size 24, Font.heavy ] [ Element.text album.name ]
+                , elInColumn [ Font.size 14 ] (Element.text <| albumInfo album)
                 ]
             , View.AlbumTracklist.view (SelectedTrack album.id) album
             ]
@@ -467,9 +487,19 @@ viewAlbum album =
 
 
 viewArtist artist =
-    div []
-        [ div [ class "h1 bold pb1 mb3 border-bottom" ] [ text artist.name ]
-        , Html.Keyed.node "div" [] (List.map viewAlbum artist.albums)
+    let
+        _ =
+            Debug.log "in viewArtist" artist.name
+    in
+    Element.column [ Element.width Element.fill ]
+        [ Element.paragraph
+            [ Font.heavy
+            , Font.size 28
+            , Border.widthEach { top = 0, right = 0, bottom = 1, left = 0 }
+            , Border.color (Element.rgba255 151 151 151 0.25)
+            ]
+            [ Element.text artist.name ]
+        , Keyed.column [ Element.spacingXY 0 40 ] (List.map viewAlbum artist.albums)
         ]
 
 
@@ -551,6 +581,7 @@ viewSidebar artists =
         , Element.scrollbarY
         , Element.htmlAttribute <| style "height" "100%"
         , Element.paddingEach { top = 0, right = 20, bottom = 0, left = 0 }
+        , Element.htmlAttribute <| onScroll SidebarScroll
         ]
         viewEntries
 
@@ -560,17 +591,19 @@ viewMain model =
         artists =
             model.selectedArtists
     in
-    div
-        [ id "albums"
-        , class "full-height-scrollable content flex-auto pl4 pr4 mb4 pt2"
-        , on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
+    Element.column
+        [ Element.scrollbarY
+        , Element.htmlAttribute <| style "height" "100%"
+        , Element.width Element.fill
+        , Element.htmlAttribute <| on "scroll" (Json.Decode.map AlbumsScroll Json.Decode.value)
+        , Element.spacingXY 0 60
         ]
-        (List.map viewArtist artists)
+        (List.map (Element.Lazy.lazy viewArtist) artists)
 
 
 view model =
     Element.layout [] <|
         Element.row []
             [ viewSidebar model.artists
-            , Element.html <| viewMain model
+            , viewMain model
             ]
