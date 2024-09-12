@@ -16,6 +16,15 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("%s", e.Errors)
 }
 
+func wrapGormErrors(gdb *gorm.DB) error {
+	errors := gdb.GetErrors()
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return &Error{Errors: errors}
+}
+
 type DB struct {
 	db *gorm.DB
 
@@ -29,6 +38,7 @@ type DB struct {
 	AlbumsView   *AlbumCollection
 	Discs        *DiscCollection
 	Images       *ImageCollection
+	Changes      *ChangeCollection
 }
 
 func Open(fpath string) (*DB, error) {
@@ -39,7 +49,7 @@ func Open(fpath string) (*DB, error) {
 
 	gdb.LogMode(true)
 
-	gdb.AutoMigrate(&File{}, &Artist{}, &Track{}, &Disc{}, &Album{}, &Image{})
+	gdb.AutoMigrate(&File{}, &Artist{}, &Track{}, &Disc{}, &Album{}, &Image{}, &Change{})
 
 	db := &DB{db: gdb}
 	db.init()
@@ -70,6 +80,7 @@ func (db *DB) init() {
 
 	db.Discs = &DiscCollection{Collection{db.model(&Disc{})}}
 	db.Images = &ImageCollection{Collection{db.model(&Image{})}}
+	db.Changes = &ChangeCollection{Collection{db.model(&Change{})}}
 }
 
 func (db *DB) createView(name string, sql string) Collection {
@@ -90,15 +101,6 @@ func (db *DB) model(i interface{}) *DB {
 	}
 }
 
-func (db *DB) wrapErrors(gdb *gorm.DB) error {
-	errors := gdb.GetErrors()
-	if len(errors) == 0 {
-		return nil
-	}
-
-	return &Error{Errors: errors}
-}
-
 func (db *DB) Register(handler interface{}) {
 	db.eventManager.Register(handler)
 }
@@ -108,11 +110,11 @@ func (db *DB) Raw(sql string, vals ...interface{}) *DB {
 }
 
 func (db *DB) Exec(sql string, vals ...interface{}) error {
-	return db.wrapErrors(db.db.Exec(sql, vals...))
+	return wrapGormErrors(db.db.Exec(sql, vals...))
 }
 
 func (db *DB) Scan(out interface{}) error {
-	return db.wrapErrors(db.db.Scan(out))
+	return wrapGormErrors(db.db.Scan(out))
 }
 
 func (db *DB) ScanRows(rows *sql.Rows, out interface{}) error {
@@ -135,7 +137,7 @@ func (c *Collection) dispatchEvent(model interface{}, eventType EventType) {
 }
 
 func (c *Collection) Create(val interface{}) error {
-	err := c.db.wrapErrors(c.db.db.Create(val))
+	err := wrapGormErrors(c.db.db.Create(val))
 	if err == nil {
 		c.dispatchEvent(val, Created)
 	}
@@ -144,7 +146,7 @@ func (c *Collection) Create(val interface{}) error {
 }
 
 func (c *Collection) Update(val interface{}) error {
-	err := c.db.wrapErrors(c.db.db.Save(val))
+	err := wrapGormErrors(c.db.db.Save(val))
 	if err == nil {
 		c.dispatchEvent(val, Updated)
 	}
@@ -163,11 +165,11 @@ func (c *Collection) FirstOrCreate(query interface{}, val interface{}) error {
 }
 
 func (c *Collection) One(out interface{}) error {
-	return c.db.wrapErrors(c.db.db.Find(out))
+	return wrapGormErrors(c.db.db.Find(out))
 }
 
 func (c *Collection) All(out interface{}) error {
-	return c.db.wrapErrors(c.db.db.Find(out))
+	return wrapGormErrors(c.db.db.Find(out))
 }
 
 func (c *Collection) Rows() (*sql.Rows, error) {
@@ -287,4 +289,8 @@ func (c *ImageCollection) FirstOrCreate(image *Image) error {
 	}
 
 	return c.Collection.FirstOrCreate(query, image)
+}
+
+type ChangeCollection struct {
+	Collection
 }

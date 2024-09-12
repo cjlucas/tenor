@@ -76,6 +76,15 @@ type Track struct {
 	ImageID string
 }
 
+func (t *Track) AfterCreate(tx *gorm.DB) error {
+	change := &Change{
+		TrackID: t.ID,
+		Event:   "created",
+	}
+
+	return wrapGormErrors(tx.Create(change))
+}
+
 type Artist struct {
 	Model
 
@@ -83,6 +92,15 @@ type Artist struct {
 
 	Albums []Album
 	Tracks []Track
+}
+
+func (a *Artist) AfterCreate(tx *gorm.DB) error {
+	change := &Change{
+		ArtistID: a.ID,
+		Event:    "created",
+	}
+
+	return wrapGormErrors(tx.Create(change))
 }
 
 type Album struct {
@@ -115,4 +133,24 @@ type Disc struct {
 	AlbumID string `gorm:"index"`
 
 	Tracks []Track
+}
+
+type Change struct {
+	ID int `gorm:"primary_key"`
+
+	TrackID  string
+	ArtistID string
+	AlbumID  string
+	DiscID   string
+
+	Event     string
+	CreatedAt time.Time
+}
+
+func (c *Change) BeforeCreate(scope *gorm.Scope) error {
+	if err := scope.SetColumn("CreatedAt", time.Now().UTC()); err != nil {
+		return err
+	}
+
+	return nil
 }
