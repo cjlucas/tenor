@@ -3,6 +3,7 @@ module Main exposing (main)
 import Api
 import Browser
 import Browser.Dom as Dom
+import Element
 import GraphQL.Client.Http
 import GraphQL.Request.Builder as GraphQL
 import Html exposing (..)

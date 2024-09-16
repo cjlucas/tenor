@@ -1,5 +1,6 @@
 module View.AlbumModal exposing (view)
 
+import Element
 import Html exposing (Html, div, img, text)
 import Html.Attributes exposing (class, classList, src)
 import Html.Events exposing (onClick, stopPropagationOn)
@@ -44,7 +45,7 @@ view dismissMsg noopMsg selectedTrackMsg album =
                                 ]
                             ]
                         , div [ class "overflow-scroll" ]
-                            [ View.AlbumTracklist.view selectedTrackMsg album_
+                            [ Element.layout [] <| View.AlbumTracklist.view selectedTrackMsg album_
                             ]
                         ]
 

@@ -1,7 +1,9 @@
 module View.AlbumTracklist exposing (view)
 
+import Element
+import Element.Font as Font
 import Html exposing (div, text)
-import Html.Attributes exposing (class)
+import Html.Attributes exposing (class, style)
 import Html.Events exposing (onClick)
 import List.Extra
 import Utils
@@ -16,20 +18,21 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
             let
                 viewTrackArtist =
                     if showTrackArtist then
-                        div [ class "h6 track-artist" ] [ text track.artistName ]
+                        Element.text track.artistName
 
                     else
-                        text ""
+                        Element.none
             in
-            div [ class "col col-6 pl1 pr1 track" ]
-                [ div [ class "flex pb1 pt2 pointer track-content", onClick (chooseTrackMsg track.id) ]
-                    [ div [ class "pr1 h5 track-position" ] [ text (String.fromInt track.position ++ ". ") ]
-                    , div [ class "flex-auto pr1" ]
-                        [ div [ class "pb1 h5" ] [ text track.name ]
-                        , viewTrackArtist
-                        ]
-                    , div [ class "h5" ] [ text (duration track) ]
+            Element.row
+                [ Element.htmlAttribute <| style "flex-basis" "auto"
+                , Element.htmlAttribute <| style "flex-shrink" "0"
+                ]
+                [ Element.text (String.fromInt track.position ++ ". ")
+                , Element.column []
+                    [ Element.text track.name
+                    , viewTrackArtist
                     ]
+                , Element.text (duration track)
                 ]
 
         i =
@@ -43,9 +46,16 @@ viewTracks chooseTrackMsg showTrackArtist tracks =
                 |> List.Extra.greedyGroupsOf 2
 
         viewRow row =
-            div [ class "flex flex-wrap track-list-row" ] (List.map viewTrack row)
+            Element.row
+                [ Element.htmlAttribute <| style "flex-basis" "auto"
+                , Element.htmlAttribute <| style "flex-shrink" "0"
+                ]
+                (List.map viewTrack row)
     in
-    div [ class "track-list pb2" ] (List.map viewRow rows)
+    Element.row []
+        [ Element.column [ Element.width (Element.fillPortion 2) ] (List.map viewTrack tracks)
+        , Element.column [ Element.width (Element.fillPortion 2) ] (List.map viewTrack tracks)
+        ]
 
 
 discName disc =
@@ -74,15 +84,16 @@ view chooseTrackMsg album =
 
         discHeader disc =
             if List.length album.discs > 1 then
-                div [ class "h3 bold pb1" ] [ text (discName disc) ]
+                Element.el [ Font.heavy, Font.size 24 ] (Element.text (discName disc))
 
             else
-                text ""
+                Element.none
 
         viewDisc disc =
-            div [ class "pt1" ]
+            Element.column []
                 [ discHeader disc
                 , viewTracks chooseTrackMsg showTrackArtists disc.tracks
                 ]
     in
-    div [] (List.map viewDisc discs)
+    Element.column [ Element.width Element.fill ]
+        (List.map viewDisc discs)
